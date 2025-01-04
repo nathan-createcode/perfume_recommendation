@@ -16,6 +16,19 @@ import os
 import subprocess
 import traceback
 
+def clean_price_column(df):
+    """
+    Membersihkan kolom 'Harga' agar hanya berisi angka float.
+    Menghapus 'Rp' dan titik sebagai pemisah ribuan.
+    """
+    try:
+        df['Harga'] = df['Harga'].str.replace('Rp', '', regex=False).str.replace('.', '', regex=False).astype(float)
+        return df
+    except Exception as e:
+        st.error(f"Terjadi kesalahan saat membersihkan kolom 'Harga': {e}")
+        return df
+
+
 # Install matplotlib jika belum terinstal
 try:
     import matplotlib.pyplot as plt
@@ -235,7 +248,21 @@ def main():
         gender = st.selectbox("Pilih Gender", ["All", "Male", "Female", "Unisex"])
         max_price = st.number_input("Harga Maksimum (dalam Rupiah)", min_value=0, max_value=7000000, value=1000000, step=100000)
 
-        if st.button("Cari"):
+    if st.button("Cari"):
+            # Validasi data
+            if 'Harga' in df.columns:
+                if df['Harga'].isnull().any():
+                    st.warning("Beberapa data di kolom 'Harga' kosong. Periksa kembali data Anda.")
+                if not df['Harga'].apply(lambda x: isinstance(x, (int, float))).all():
+                    st.warning("Kolom 'Harga' mengandung nilai yang tidak valid. Data tidak dapat diproses.")
+                    return
+            else:
+                st.error("Kolom 'Harga' tidak ditemukan dalam database. Tidak dapat melanjutkan pencarian.")
+                return
+
+            # Bersihkan data harga
+            df = clean_price_column(df)
+
             if not df.empty:
                 cosine_results = search_perfume_cosine(df, description, gender, max_price)
                 chatgpt_results = search_perfume_chatgpt(description, gender, max_price)
@@ -244,7 +271,7 @@ def main():
                 for _, row in cosine_results.iterrows():
                     st.write(f"**{row['Nama Parfum']}** oleh {row['Brand atau Produsen']}")
                     st.write(f"Kategori: {row['Kategori Aroma']}")
-                    st.write(f"Harga: {row['Harga']}")
+                    st.write(f"Harga: Rp {int(row['Harga']):,}".replace(",", "."))
                     st.write(f"Top Notes: {', '.join(ast.literal_eval(row['Top Notes']))}")
                     st.write(f"Middle Notes: {', '.join(ast.literal_eval(row['Middle Notes']))}")
                     st.write(f"Base Notes: {', '.join(ast.literal_eval(row['Base Notes']))}")
