@@ -16,11 +16,12 @@ import os
 import subprocess
 
 # Install matplotlib jika belum terinstal
-# try:
-#     import matplotlib.pyplot as plt
-# except ModuleNotFoundError:
-#     subprocess.check_call([os.sys.executable, "-m", "pip", "install", "matplotlib"])
-#     import matplotlib.pyplot as plt
+try:
+    import matplotlib.pyplot as plt
+except ModuleNotFoundError:
+    subprocess.check_call([os.sys.executable, "-m", "pip", "install", "matplotlib"])
+    import matplotlib.pyplot as plt
+
 print("zlib available:", features.check('zlib'))
 
 def check_installed_packages():
