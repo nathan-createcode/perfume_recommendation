@@ -12,6 +12,23 @@ import ast
 import logging
 from dotenv import load_dotenv
 import os
+import subprocess
+
+# Install matplotlib jika belum terinstal
+try:
+    import matplotlib.pyplot as plt
+except ModuleNotFoundError:
+    subprocess.check_call([os.sys.executable, "-m", "pip", "install", "matplotlib"])
+    import matplotlib.pyplot as plt
+
+def check_installed_packages():
+    try:
+        installed = subprocess.check_output(['pip', 'list'])
+        print(installed.decode('utf-8'))
+    except Exception as e:
+        print(f"Error checking installed packages: {e}")
+
+check_installed_packages()
 
 # Konfigurasi logging
 logging.basicConfig(level=logging.INFO)
