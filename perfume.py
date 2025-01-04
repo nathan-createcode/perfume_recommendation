@@ -48,6 +48,9 @@ except sqlite3.Error as e:
     logging.error(f"Error connecting to database: {e}")
     st.error("Terjadi kesalahan saat menghubungkan ke database.")
 
+if not os.path.exists('perfume_recommendation.db'):
+    st.error("Database tidak ditemukan. Pastikan file `perfume_recommendation.db` ada di direktori.")
+
 # Fungsi untuk membaca data dari database
 def get_perfume_data():
     try:
@@ -285,7 +288,7 @@ def main():
         if st.button("Tambah Parfum"):
             if nama and brand:  # Minimal nama dan brand harus diisi
                 if image:
-                    image_path = os.path.join("img_upload", image.name)
+                    image_path = os.path.join("img", image.name)
                     with open(image_path, "wb") as f:
                         f.write(image.getbuffer())
                 else:
