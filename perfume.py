@@ -14,6 +14,7 @@ import logging
 from dotenv import load_dotenv
 import os
 import subprocess
+import traceback
 
 # Install matplotlib jika belum terinstal
 try:
@@ -244,9 +245,10 @@ def main():
                     st.write(f"**{row['Nama Parfum']}** oleh {row['Brand atau Produsen']}")
                     st.write(f"Kategori: {row['Kategori Aroma']}")
                     st.write(f"Harga: {row['Harga']}")
-                    st.write(f"Top Notes: {', '.join(eval(row['Top Notes']))}")
-                    st.write(f"Middle Notes: {', '.join(eval(row['Middle Notes']))}")
-                    st.write(f"Base Notes: {', '.join(eval(row['Base Notes']))}")
+                    st.write(f"Top Notes: {', '.join(ast.literal_eval(row['Top Notes']))}")
+                    st.write(f"Middle Notes: {', '.join(ast.literal_eval(row['Middle Notes']))}")
+                    st.write(f"Base Notes: {', '.join(ast.literal_eval(row['Base Notes']))}")
+
                     if 'image_path' in row and row['image_path']:
                         try:
                             image = Image.open(row['image_path'])
@@ -320,6 +322,13 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+try:
+    main()
+except Exception as e:
+    logging.error(f"Error in main: {e}")
+    st.error("Aplikasi mengalami error. Silakan cek log untuk detailnya.")
+    traceback.print_exc()
 
 # Tutup koneksi database saat aplikasi selesai
 conn.close()
