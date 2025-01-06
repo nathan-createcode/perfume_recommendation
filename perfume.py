@@ -123,6 +123,34 @@ def visualize_data(df):
     plt.tight_layout()
     st.pyplot(fig)
 
+    st.write("""
+        🌸 **Kategori Aroma Parfum**
+
+        Parfum memiliki berbagai kategori aroma yang unik, seperti:
+        - **Floral**: Aroma bunga-bungaan yang lembut dan feminin.
+        - **Woody**: Aroma kayu-kayuan yang hangat dan maskulin.
+        - **Oriental**: Aroma rempah-rempah eksotis yang sensual.
+        - **Fresh**: Aroma segar seperti citrus atau air laut.
+        - **Gourmand**: Aroma manis seperti vanila atau karamel.
+
+        🎵 **Struktur Aroma Parfum**
+
+        Parfum memiliki tiga lapisan aroma yang berbeda:
+        1. **Top Notes**: Aroma pertama yang tercium, biasanya ringan dan segar.
+        2. **Middle Notes**: Aroma yang muncul setelah top notes menghilang, membentuk "jantung" parfum.
+        3. **Base Notes**: Aroma yang bertahan paling lama, memberikan kedalaman pada parfum.
+
+        💧 **Konsentrasi Parfum**
+
+        - **Parfum (P)**: Konsentrasi tertinggi (20-30%), bertahan 6-8 jam.
+        - **Eau de Parfum (EDP)**: Konsentrasi 15-20%, bertahan 4-5 jam.
+        - **Eau de Toilette (EDT)**: Konsentrasi 5-15%, bertahan 2-3 jam.
+        - **Eau de Cologne (EDC)**: Konsentrasi 2-4%, bertahan 2 jam.
+        - **Eau Fraiche**: Konsentrasi terendah (1-3%), bertahan 1 jam.
+
+        Semakin tinggi konsentrasinya, semakin kuat dan tahan lama aromanya!
+        """)
+
 # Fungsi untuk mencari parfum dengan Cosine Similarity
 def search_perfume_cosine(df, description, gender, max_price):
     df['combined_text'] = df['Nama Parfum'] + ' ' + df['Brand atau Produsen'] + ' ' + df['Kategori Aroma'] + ' ' + df['Top Notes'].astype(str) + ' ' + df['Middle Notes'].astype(str) + ' ' + df['Base Notes'].astype(str) + ' ' + df['Harga'].astype(str) + ' ' + df['Gender'].astype(str)
