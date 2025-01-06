@@ -184,12 +184,12 @@ def search_perfume(query, filters):
         if filters['musim']:
             sql_query += " AND \"Musim atau Cuaca\" = ?"
             params.append(filters['musim'])
-        if filters['min_harga'] is not None:
+        if filters['min_harga']:
             sql_query += " AND CAST(REPLACE(REPLACE(Harga, 'Rp', ''), '.', '') AS INTEGER) >= ?"
-            params.append(filters['min_harga'])
-        if filters['max_harga'] is not None:
+            params.append(int(filters['min_harga'].replace('Rp', '').replace('.', '')))
+        if filters['max_harga']:
             sql_query += " AND CAST(REPLACE(REPLACE(Harga, 'Rp', ''), '.', '') AS INTEGER) <= ?"
-            params.append(filters['max_harga'])
+            params.append(int(filters['max_harga'].replace('Rp', '').replace('.', '')))
 
         df = pd.read_sql_query(sql_query, conn, params=params)
         return df
@@ -225,7 +225,8 @@ def main():
         with col2:
             daya_tahan = st.selectbox("Daya Tahan", ["", "Pendek", "Sedang", "Lama", "Sangat Lama"])
             musim = st.selectbox("Musim atau Cuaca", ["", "Semua Musim", "Musim Panas", "Musim Dingin", "Musim Semi", "Musim Gugur", "Malam Hari"])
-            min_harga, max_harga = st.slider("Range Harga (dalam Ribu Rupiah)", 0, 10000, (0, 10000), step=100)
+            min_harga = st.text_input("Harga Minimum (contoh: Rp1.500.000)", "")
+            max_harga = st.text_input("Harga Maksimum (contoh: Rp10.000.000)", "")
 
         filters = {
             'gender': gender,
@@ -233,8 +234,8 @@ def main():
             'kekuatan_aroma': kekuatan_aroma,
             'daya_tahan': daya_tahan,
             'musim': musim,
-            'min_harga': min_harga * 1000,
-            'max_harga': max_harga * 1000
+            'min_harga': min_harga,
+            'max_harga': max_harga
         }
 
         if st.button("Cari"):
