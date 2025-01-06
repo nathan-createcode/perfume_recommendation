@@ -11,18 +11,28 @@ import ast
 import logging
 import os
 from PIL import Image
+from sqlite3 import Error
 
 # Konfigurasi logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Fungsi untuk mendapatkan koneksi database
-@st.cache_resource
 def get_db_connection():
-    return sqlite3.connect('perfume_recommendation.db', check_same_thread=False)
+    try:
+        conn = sqlite3.connect('perfume_recommendation.db', check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        return conn
+    except Error as e:
+        logging.error(f"Error connecting to database: {e}")
+        return None
 
-# Inisialisasi koneksi database
-conn = get_db_connection()
+# Fungsi untuk menutup koneksi database
+def close_db_connection(conn):
+    if conn:
+        conn.close()
+        logging.info("Database connection closed.")
 
+# Fungsi untuk membersihkan kolom harga
 def clean_price_column(df):
     try:
         df['Harga'] = df['Harga'].str.replace('Rp', '', regex=False).str.replace('.', '', regex=False)
@@ -35,6 +45,11 @@ def clean_price_column(df):
 
 # Fungsi untuk membaca data dari database
 def get_perfume_data():
+    conn = get_db_connection()
+    if not conn:
+        st.error("Tidak dapat terhubung ke database.")
+        return pd.DataFrame()
+
     try:
         query = "SELECT * FROM perfumes"
         df = pd.read_sql_query(query, conn)
@@ -48,6 +63,8 @@ def get_perfume_data():
         logging.error(f"Error reading data from database: {e}")
         st.error("Terjadi kesalahan saat membaca data dari database.")
         return pd.DataFrame()
+    finally:
+        close_db_connection(conn)
 
 # Fungsi untuk membersihkan data
 def clean_data(df):
@@ -142,6 +159,11 @@ def ai_model(df, model_type="regression"):
 
 # Fungsi untuk menambahkan parfum baru
 def add_new_perfume(data):
+    conn = get_db_connection()
+    if not conn:
+        st.error("Tidak dapat terhubung ke database.")
+        return False
+
     query = """
     INSERT INTO perfumes (
         "Nama Parfum", "Brand atau Produsen", "Jenis", "Kategori Aroma",
@@ -154,13 +176,25 @@ def add_new_perfume(data):
         logging.info(f"Attempting to add new perfume: {data}")
         logging.debug(f"Query: {query}")
         logging.debug(f"Data: {tuple(data.values())}")
-        with conn:  # This ensures that changes are committed
+        with conn:
             conn.execute(query, tuple(data.values()))
         logging.info("New perfume added successfully")
+
+        # Verifikasi penambahan
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM perfumes WHERE \"Nama Parfum\" = ?", (data['Nama Parfum'],))
+        result = cursor.fetchone()
+        if result:
+            logging.info(f"Verified: New perfume found in database: {result}")
+        else:
+            logging.warning("Verification failed: New perfume not found in database")
+
         return True
     except sqlite3.Error as e:
         logging.error(f"Error adding new perfume: {e}")
         return False
+    finally:
+        close_db_connection(conn)
 
 def normalize_price(price_str):
     if not price_str:
@@ -177,6 +211,11 @@ def normalize_price(price_str):
 
 # Fungsi untuk mencari parfum
 def search_perfume(query, filters):
+    conn = get_db_connection()
+    if not conn:
+        st.error("Tidak dapat terhubung ke database.")
+        return pd.DataFrame()
+
     try:
         sql_query = """
         SELECT * FROM perfumes
@@ -216,6 +255,8 @@ def search_perfume(query, filters):
     except sqlite3.Error as e:
         logging.error(f"Error searching perfume: {e}")
         return pd.DataFrame()
+    finally:
+        close_db_connection(conn)
 
 def normalize_image_path(path):
     # Ubah backslash menjadi forward slash
@@ -226,11 +267,18 @@ def normalize_image_path(path):
     return normalized
 
 def optimize_database():
+    conn = get_db_connection()
+    if not conn:
+        st.error("Tidak dapat terhubung ke database.")
+        return
+
     try:
         conn.execute("VACUUM")
         logging.info("Database optimized successfully")
     except sqlite3.Error as e:
         logging.error(f"Error optimizing database: {e}")
+    finally:
+        close_db_connection(conn)
 
 # Fungsi utama aplikasi
 def main():
@@ -354,16 +402,6 @@ def main():
                     if add_new_perfume(new_perfume):
                         st.success("Parfum baru berhasil ditambahkan!")
                         logging.info(f"New perfume added: {new_perfume}")
-
-                        # Verifikasi data dalam database
-                        verify_query = "SELECT * FROM perfumes WHERE \"Nama Parfum\" = ?"
-                        cursor = conn.cursor()
-                        cursor.execute(verify_query, (nama,))
-                        result = cursor.fetchone()
-                        if result:
-                            logging.info(f"Verified: Perfume found in database: {result}")
-                        else:
-                            logging.warning(f"Verification failed: Perfume not found in database")
                     else:
                         st.error("Terjadi kesalahan saat menambahkan parfum baru. Silakan cek log untuk detailnya.")
             else:
@@ -381,7 +419,5 @@ if __name__ == "__main__":
     except Exception as e:
         logging.error(f"Error in main: {e}")
         st.error("Aplikasi mengalami error. Silakan cek log untuk detailnya.")
-    finally:
-        conn.close()
 
 print("Aplikasi Rekomendasi Parfum berhasil dijalankan!")
