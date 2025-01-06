@@ -251,6 +251,10 @@ def main():
         if st.button("Cari"):
             results = search_perfume("", filters)
             if not results.empty:
+                st.write("Columns in results:")
+                st.write(results.columns)
+                st.write("Sample image_path:")
+                st.write(results['image_path'].iloc[0] if 'image_path' in results.columns else "image_path not found")
                 # Menampilkan hasil pencarian
                 for index, row in results.iterrows():
                     st.write(f"### {row['Nama Parfum']}")
