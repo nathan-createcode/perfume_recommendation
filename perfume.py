@@ -165,9 +165,9 @@ def search_perfume(query, filters):
     try:
         sql_query = """
         SELECT * FROM perfumes
-        WHERE ("Nama Parfum" LIKE ? OR "Brand atau Produsen" LIKE ? OR "Kategori Aroma" LIKE ?)
+        WHERE 1=1
         """
-        params = [f"%{query}%"]*3
+        params = []
 
         if filters['gender']:
             sql_query += " AND Gender = ?"
@@ -214,7 +214,6 @@ def main():
 
     elif choice == "Search Perfume":
         st.subheader("Cari Parfum")
-        search_query = st.text_input("Masukkan nama parfum, brand, atau kategori aroma:")
 
         col1, col2 = st.columns(2)
         with col1:
@@ -225,8 +224,8 @@ def main():
         with col2:
             daya_tahan = st.selectbox("Daya Tahan", ["", "Pendek", "Sedang", "Lama", "Sangat Lama"])
             musim = st.selectbox("Musim atau Cuaca", ["", "Semua Musim", "Musim Panas", "Musim Dingin", "Musim Semi", "Musim Gugur", "Malam Hari"])
-            min_harga = st.text_input("Harga Minimum (contoh: Rp0)", "")
-            max_harga = st.text_input("Harga Maksimum (contoh: Rp7.000.000)", "")
+            min_harga = st.text_input("Harga Minimum (contoh: Rp1.500.000)", "")
+            max_harga = st.text_input("Harga Maksimum (contoh: Rp10.000.000)", "")
 
         filters = {
             'gender': gender,
@@ -239,7 +238,7 @@ def main():
         }
 
         if st.button("Cari"):
-            results = search_perfume(search_query, filters)
+            results = search_perfume("", filters)  # Pass empty string instead of search_query
             if not results.empty:
                 # Menghapus kolom yang tidak diinginkan
                 results = results.drop(columns=['image_path', 'created_at', 'updated_at'], errors='ignore')
@@ -329,3 +328,4 @@ if __name__ == "__main__":
             conn.close()
 
 print("Aplikasi Rekomendasi Parfum berhasil dijalankan!")
+
