@@ -160,15 +160,38 @@ def add_new_perfume(data):
         logging.error(f"Error adding new perfume: {e}")
         return False
 
-
 # Fungsi untuk mencari parfum
-def search_perfume(query):
+def search_perfume(query, filters):
     try:
         sql_query = """
         SELECT * FROM perfumes
-        WHERE "Nama Parfum" LIKE ? OR "Brand atau Produsen" LIKE ? OR "Kategori Aroma" LIKE ?
+        WHERE ("Nama Parfum" LIKE ? OR "Brand atau Produsen" LIKE ? OR "Kategori Aroma" LIKE ?)
         """
-        df = pd.read_sql_query(sql_query, conn, params=[f"%{query}%"]*3)
+        params = [f"%{query}%"]*3
+
+        if filters['gender']:
+            sql_query += " AND Gender = ?"
+            params.append(filters['gender'])
+        if filters['jenis']:
+            sql_query += " AND Jenis = ?"
+            params.append(filters['jenis'])
+        if filters['kekuatan_aroma']:
+            sql_query += " AND \"Kekuatan Aroma\" = ?"
+            params.append(filters['kekuatan_aroma'])
+        if filters['daya_tahan']:
+            sql_query += " AND \"Daya Tahan\" = ?"
+            params.append(filters['daya_tahan'])
+        if filters['musim']:
+            sql_query += " AND \"Musim atau Cuaca\" = ?"
+            params.append(filters['musim'])
+        if filters['min_harga'] is not None:
+            sql_query += " AND CAST(REPLACE(REPLACE(Harga, 'Rp', ''), '.', '') AS INTEGER) >= ?"
+            params.append(filters['min_harga'])
+        if filters['max_harga'] is not None:
+            sql_query += " AND CAST(REPLACE(REPLACE(Harga, 'Rp', ''), '.', '') AS INTEGER) <= ?"
+            params.append(filters['max_harga'])
+
+        df = pd.read_sql_query(sql_query, conn, params=params)
         return df
     except sqlite3.Error as e:
         logging.error(f"Error searching perfume: {e}")
@@ -192,10 +215,52 @@ def main():
     elif choice == "Search Perfume":
         st.subheader("Cari Parfum")
         search_query = st.text_input("Masukkan nama parfum, brand, atau kategori aroma:")
-        if search_query:
-            results = search_perfume(search_query)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            gender = st.selectbox("Gender", ["", "Female", "Male", "Unisex"])
+            jenis = st.selectbox("Jenis", ["", "EDP", "EDT", "EDC", "Perfume", "Extrait de Parfum", "Parfum Cologne"])
+            kekuatan_aroma = st.selectbox("Kekuatan Aroma", ["", "Ringan", "Sedang", "Kuat", "Sangat Kuat"])
+
+        with col2:
+            daya_tahan = st.selectbox("Daya Tahan", ["", "Pendek", "Sedang", "Lama", "Sangat Lama"])
+            musim = st.selectbox("Musim atau Cuaca", ["", "Semua Musim", "Musim Panas", "Musim Dingin", "Musim Semi", "Musim Gugur", "Malam Hari"])
+            min_harga, max_harga = st.slider("Range Harga (dalam Ribu Rupiah)", 0, 10000, (0, 10000), step=100)
+
+        filters = {
+            'gender': gender,
+            'jenis': jenis,
+            'kekuatan_aroma': kekuatan_aroma,
+            'daya_tahan': daya_tahan,
+            'musim': musim,
+            'min_harga': min_harga * 1000,
+            'max_harga': max_harga * 1000
+        }
+
+        if st.button("Cari"):
+            results = search_perfume(search_query, filters)
             if not results.empty:
-                st.write(results)
+                # Menghapus kolom yang tidak diinginkan
+                results = results.drop(columns=['image_path', 'created_at', 'updated_at'], errors='ignore')
+
+                # Menampilkan hasil pencarian
+                for index, row in results.iterrows():
+                    st.write(f"### {row['Nama Parfum']}")
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        if row['image_path'] and os.path.exists(row['image_path']):
+                            image = Image.open(row['image_path'])
+                            st.image(image, caption=row['Nama Parfum'], use_column_width=True)
+                        else:
+                            st.write("Gambar tidak tersedia")
+
+                    with col2:
+                        for column in results.columns:
+                            if column not in ['Nama Parfum', 'image_path']:
+                                st.write(f"**{column}:** {row[column]}")
+
+                    st.write("---")
             else:
                 st.write("Tidak ada hasil yang ditemukan.")
 
@@ -203,17 +268,17 @@ def main():
         st.subheader("Tambah Parfum Baru")
         nama = st.text_input("Nama Parfum")
         brand = st.text_input("Brand atau Produsen")
-        jenis = st.text_input("Jenis Parfum (Eau de Parfum, dll.)")
+        jenis = st.selectbox("Jenis Parfum", ["EDP", "EDT", "EDC", "Perfume", "Extrait de Parfum", "Parfum Cologne"])
         kategori = st.text_input("Kategori Aroma")
         top_notes = st.text_area("Top Notes (pisahkan dengan koma)")
         middle_notes = st.text_area("Middle Notes (pisahkan dengan koma)")
         base_notes = st.text_area("Base Notes (pisahkan dengan koma)")
-        kekuatan = st.text_input("Kekuatan Aroma")
-        daya_tahan = st.text_input("Daya Tahan (dalam jam)")
-        musim = st.text_input("Musim atau Cuaca")
+        kekuatan = st.selectbox("Kekuatan Aroma", ["Ringan", "Sedang", "Kuat", "Sangat Kuat"])
+        daya_tahan = st.selectbox("Daya Tahan", ["Pendek", "Sedang", "Lama", "Sangat Lama"])
+        musim = st.selectbox("Musim atau Cuaca", ["Semua Musim", "Musim Panas", "Musim Dingin", "Musim Semi", "Musim Gugur", "Malam Hari"])
         harga = st.text_input("Harga (format: Rp X.XXX.XXX)")
         ukuran = st.text_input("Ukuran Botol")
-        gender = st.selectbox("Gender", ["Male", "Female", "Unisex"])
+        gender = st.selectbox("Gender", ["Female", "Male", "Unisex"])
         image = st.file_uploader("Upload Gambar Parfum", type=['png', 'jpg', 'jpeg'])
 
         if st.button("Tambah Parfum"):
