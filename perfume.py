@@ -160,6 +160,19 @@ def add_new_perfume(data):
         logging.error(f"Error adding new perfume: {e}")
         return False
 
+def normalize_price(price_str):
+    if not price_str:
+        return None
+    # Remove 'Rp' and any dots or spaces
+    price_str = price_str.replace('Rp', '').replace('.', '').replace(' ', '')
+    try:
+        # Convert to integer
+        price = int(price_str)
+        # Format back to standard format
+        return f"Rp{price:,}".replace(',', '.')
+    except ValueError:
+        return None
+
 # Fungsi untuk mencari parfum
 def search_perfume(query, filters):
     try:
@@ -184,12 +197,11 @@ def search_perfume(query, filters):
         if filters['musim']:
             sql_query += " AND \"Musim atau Cuaca\" = ?"
             params.append(filters['musim'])
-        if filters['min_harga']:
-            sql_query += " AND CAST(REPLACE(REPLACE(Harga, 'Rp', ''), '.', '') AS INTEGER) >= ?"
-            params.append(int(filters['min_harga'].replace('Rp', '').replace('.', '')))
         if filters['max_harga']:
-            sql_query += " AND CAST(REPLACE(REPLACE(Harga, 'Rp', ''), '.', '') AS INTEGER) <= ?"
-            params.append(int(filters['max_harga'].replace('Rp', '').replace('.', '')))
+            normalized_price = normalize_price(filters['max_harga'])
+            if normalized_price:
+                sql_query += " AND CAST(REPLACE(REPLACE(Harga, 'Rp', ''), '.', '') AS INTEGER) <= ?"
+                params.append(int(normalized_price.replace('Rp', '').replace('.', '')))
 
         df = pd.read_sql_query(sql_query, conn, params=params)
         return df
@@ -224,7 +236,7 @@ def main():
         with col2:
             daya_tahan = st.selectbox("Daya Tahan", ["", "Pendek", "Sedang", "Lama", "Sangat Lama"])
             musim = st.selectbox("Musim atau Cuaca", ["", "Semua Musim", "Musim Panas", "Musim Dingin", "Musim Semi", "Musim Gugur", "Malam Hari"])
-            max_harga = st.text_input("Harga Maksimum (contoh: Rp10.000.000)", "")
+            harga = st.text_input("Batas Harga (contoh: Rp7.000.000)", "")
 
         filters = {
             'gender': gender,
@@ -232,8 +244,8 @@ def main():
             'kekuatan_aroma': kekuatan_aroma,
             'daya_tahan': daya_tahan,
             'musim': musim,
-            # 'min_harga': min_harga,
-            'max_harga': max_harga
+            'min_harga': None,
+            'max_harga': harga
         }
 
         if st.button("Cari"):
