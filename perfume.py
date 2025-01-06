@@ -160,6 +160,7 @@ def add_new_perfume(data):
         logging.error(f"Error adding new perfume: {e}")
         return False
 
+
 # Fungsi untuk mencari parfum
 def search_perfume(query):
     try:
