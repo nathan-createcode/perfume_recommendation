@@ -1,0 +1,36 @@
+2025-01-06 22:27:38,101 - INFO - Percobaan 1 dari 3
+2025-01-06 22:27:40,103 - INFO - Hasil pemeriksaan integritas: ok
+2025-01-06 22:27:40,103 - ERROR - Error database pada percobaan 1: Safety level may not be changed inside a transaction
+2025-01-06 22:27:42,105 - INFO - Koneksi database ditutup
+2025-01-06 22:27:42,106 - INFO - Percobaan 2 dari 3
+2025-01-06 22:27:44,110 - INFO - Hasil pemeriksaan integritas: ok
+2025-01-06 22:27:44,110 - ERROR - Error database pada percobaan 2: Safety level may not be changed inside a transaction
+2025-01-06 22:27:46,112 - INFO - Koneksi database ditutup
+2025-01-06 22:27:46,112 - INFO - Percobaan 3 dari 3
+2025-01-06 22:27:48,114 - INFO - Hasil pemeriksaan integritas: ok
+2025-01-06 22:27:48,115 - ERROR - Error database pada percobaan 3: Safety level may not be changed inside a transaction
+2025-01-06 22:27:50,120 - INFO - Koneksi database ditutup
+2025-01-06 22:31:08,995 - INFO - Percobaan 1 dari 3
+2025-01-06 22:31:10,997 - INFO - Hasil pemeriksaan integritas: ok
+2025-01-06 22:31:10,997 - ERROR - Error database pada percobaan 1: Safety level may not be changed inside a transaction
+2025-01-06 22:31:12,999 - INFO - Koneksi database ditutup
+2025-01-06 22:31:13,000 - INFO - Percobaan 2 dari 3
+2025-01-06 22:31:15,004 - INFO - Hasil pemeriksaan integritas: ok
+2025-01-06 22:31:15,005 - ERROR - Error database pada percobaan 2: Safety level may not be changed inside a transaction
+2025-01-06 22:31:17,006 - INFO - Koneksi database ditutup
+2025-01-06 22:31:17,007 - INFO - Percobaan 3 dari 3
+2025-01-06 22:31:19,010 - INFO - Hasil pemeriksaan integritas: ok
+2025-01-06 22:31:19,011 - ERROR - Error database pada percobaan 3: Safety level may not be changed inside a transaction
+2025-01-06 22:31:21,012 - INFO - Koneksi database ditutup
+2025-01-06 22:33:48,321 - INFO - Percobaan 1 dari 3
+2025-01-06 22:33:50,340 - INFO - Hasil pemeriksaan integritas: ok
+2025-01-06 22:33:50,341 - ERROR - Error database pada percobaan 1: Safety level may not be changed inside a transaction
+2025-01-06 22:33:52,342 - INFO - Koneksi database ditutup
+2025-01-06 22:33:52,342 - INFO - Percobaan 2 dari 3
+2025-01-06 22:33:54,345 - INFO - Hasil pemeriksaan integritas: ok
+2025-01-06 22:33:54,346 - ERROR - Error database pada percobaan 2: Safety level may not be changed inside a transaction
+2025-01-06 22:33:56,347 - INFO - Koneksi database ditutup
+2025-01-06 22:33:56,348 - INFO - Percobaan 3 dari 3
+2025-01-06 22:33:58,349 - INFO - Hasil pemeriksaan integritas: ok
+2025-01-06 22:33:58,350 - ERROR - Error database pada percobaan 3: Safety level may not be changed inside a transaction
+2025-01-06 22:34:00,351 - INFO - Koneksi database ditutup

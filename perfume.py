@@ -167,11 +167,13 @@ def ai_model(df, model_type="regression"):
     # Prediksi untuk data baru
     st.subheader("Prediksi Harga Parfum")
     st.write("Masukkan data untuk prediksi:")
-    gender_input = st.selectbox("Gender (0: Female, 1: Male, 2: Unisex)", [0, 1, 2])
-    kategori_input = st.number_input("Kategori Aroma (angka)", min_value=0)
+    gender_input = st.selectbox("Gender", ["Female", "Male", "Unisex"])
+    kategori_input = st.selectbox("Kategori Aroma", df['Kategori Aroma'].unique())
 
     if st.button("Prediksi"):
-        prediction = model.predict([[gender_input, kategori_input]])
+        gender_encoded = le.transform([gender_input])[0]
+        kategori_encoded = le.transform([kategori_input])[0]
+        prediction = model.predict([[gender_encoded, kategori_encoded]])
         st.write(f"Prediksi Harga: Rp {prediction[0]:,.0f}")
 
 def normalize_price(price_str):
@@ -280,7 +282,7 @@ def check_database_status():
 
         # Periksa parfum terakhir yang ditambahkan
         cursor.execute("""
-            SELECT "Nama Parfum", "Brand atau Produsen", "created_at"
+            SELECT "Nama Parfum", "Brand atau Produsen"
             FROM perfumes
             ORDER BY rowid DESC
             LIMIT 1

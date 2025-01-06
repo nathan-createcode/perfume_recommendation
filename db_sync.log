@@ -1,0 +1,12 @@
+2025-01-06 22:24:18,960 - INFO - Total records in database: 199
+2025-01-06 22:24:18,960 - INFO - Last record: (199, 'Zoologist Tyrannosaurus Rex', 'Zoologist')
+2025-01-06 22:24:18,961 - ERROR - Database error: database table is locked
+2025-01-06 22:24:18,961 - INFO - Database connection closed
+2025-01-06 22:24:57,184 - INFO - Total records in database: 199
+2025-01-06 22:24:57,185 - INFO - Last record: (199, 'Zoologist Tyrannosaurus Rex', 'Zoologist')
+2025-01-06 22:24:57,185 - ERROR - Database error: database table is locked
+2025-01-06 22:24:57,185 - INFO - Database connection closed
+2025-01-06 22:25:31,376 - INFO - Total records in database: 199
+2025-01-06 22:25:31,377 - INFO - Last record: (199, 'Zoologist Tyrannosaurus Rex', 'Zoologist')
+2025-01-06 22:25:31,381 - ERROR - Database error: database table is locked
+2025-01-06 22:25:31,382 - INFO - Database connection closed
