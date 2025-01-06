@@ -249,28 +249,28 @@ def main():
         }
 
         if st.button("Cari"):
-            results = search_perfume("", filters)  # Pass empty string instead of search_query
+            results = search_perfume("", filters)
             if not results.empty:
-                # Menghapus kolom yang tidak diinginkan
-                results = results.drop(columns=['image_path', 'created_at', 'updated_at'], errors='ignore')
-
                 # Menampilkan hasil pencarian
                 for index, row in results.iterrows():
                     st.write(f"### {row['Nama Parfum']}")
                     col1, col2 = st.columns(2)
-
                     with col1:
-                        if row['image_path'] and os.path.exists(row['image_path']):
-                            image = Image.open(row['image_path'])
-                            st.image(image, caption=row['Nama Parfum'], use_column_width=True)
+                        # Check if image_path exists *before* trying to open it
+                        if 'image_path' in row and row['image_path'] and os.path.exists(row['image_path']):
+                            try:
+                                image = Image.open(row['image_path'])
+                                st.image(image, caption=row['Nama Parfum'], use_column_width=True)
+                            except Exception as e:
+                                st.error(f"Error displaying image: {e}")
+                                st.write("Gambar tidak tersedia.")
                         else:
-                            st.write("Gambar tidak tersedia")
-
+                            st.write("Gambar tidak tersedia.")
                     with col2:
+                        # Exclude 'image_path' from display
                         for column in results.columns:
-                            if column not in ['Nama Parfum', 'image_path']:
+                            if column not in ['Nama Parfum', 'image_path', 'created_at', 'updated_at']:
                                 st.write(f"**{column}:** {row[column]}")
-
                     st.write("---")
             else:
                 st.write("Tidak ada hasil yang ditemukan.")
