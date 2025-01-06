@@ -260,16 +260,22 @@ def main():
                     st.write(f"### {row['Nama Parfum']}")
                     col1, col2 = st.columns(2)
                     with col1:
-                        # Check if image_path exists *before* trying to open it
-                        if 'image_path' in row and row['image_path'] and os.path.exists(row['image_path']):
-                            try:
-                                image = Image.open(row['image_path'])
-                                st.image(image, caption=row['Nama Parfum'], use_column_width=True)
-                            except Exception as e:
-                                st.error(f"Error displaying image: {e}")
-                                st.write("Gambar tidak tersedia.")
+                        if 'image_path' in row and row['image_path']:
+                            # Normalize the path and make it relative to the current directory
+                            normalized_path = os.path.normpath(row['image_path'])
+                            full_path = os.path.join(os.path.dirname(__file__), normalized_path)
+                            st.write(f"Full image path: {full_path}")
+                            st.write(f"File exists: {os.path.exists(full_path)}")
+                            if os.path.exists(full_path):
+                                try:
+                                    image = Image.open(full_path)
+                                    st.image(image, caption=row['Nama Parfum'], use_column_width=True)
+                                except Exception as e:
+                                    st.error(f"Error displaying image: {e}")
+                            else:
+                                st.write("Gambar tidak ditemukan di lokasi yang ditentukan.")
                         else:
-                            st.write("Gambar tidak tersedia.")
+                            st.write("Path gambar tidak tersedia.")
                     with col2:
                         # Exclude 'image_path' from display
                         for column in results.columns:
