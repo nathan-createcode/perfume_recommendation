@@ -251,11 +251,7 @@ def main():
         if st.button("Cari"):
             results = search_perfume("", filters)
             if not results.empty:
-                st.write("Columns in results:")
-                st.write(results.columns)
-                st.write("Sample image_path:")
-                st.write(results['image_path'].iloc[0] if 'image_path' in results.columns else "image_path not found")
-                # Menampilkan hasil pencarian
+                st.write(f"Ditemukan {len(results)} hasil:")
                 for index, row in results.iterrows():
                     st.write(f"### {row['Nama Parfum']}")
                     col1, col2 = st.columns(2)
@@ -263,9 +259,10 @@ def main():
                         if 'image_path' in row and row['image_path']:
                             # Normalize the path and make it relative to the current directory
                             normalized_path = os.path.normpath(row['image_path'])
+                            # Remove the 'perfume_recommendation/' prefix if it exists
+                            if normalized_path.startswith('perfume_recommendation/'):
+                                normalized_path = normalized_path[len('perfume_recommendation/'):]
                             full_path = os.path.join(os.path.dirname(__file__), normalized_path)
-                            st.write(f"Full image path: {full_path}")
-                            st.write(f"File exists: {os.path.exists(full_path)}")
                             if os.path.exists(full_path):
                                 try:
                                     image = Image.open(full_path)
@@ -305,6 +302,7 @@ def main():
         if st.button("Tambah Parfum"):
             if nama and brand:
                 if image:
+                    # Save the image in the 'img' folder
                     image_path = os.path.join("img", image.name)
                     with open(image_path, "wb") as f:
                         f.write(image.getbuffer())
