@@ -219,12 +219,6 @@ def normalize_image_path(path):
 
 # Fungsi utama aplikasi
 def main():
-    st.write(f"Direktori kerja saat ini: {os.getcwd()}")
-    st.write(f"Isi direktori saat ini: {os.listdir('.')}")
-    if os.path.exists('img'):
-        st.write(f"Isi direktori img: {os.listdir('img')}")
-    else:
-        st.write("Direktori 'img' tidak ditemukan.")
     st.title("Aplikasi Rekomendasi Parfum")
 
     menu = ["Home", "Search Perfume", "Add New Perfume", "AI Model"]
@@ -273,15 +267,14 @@ def main():
                         if 'image_path' in row and row['image_path']:
                             normalized_path = normalize_image_path(row['image_path'])
                             full_path = os.path.join(os.getcwd(), normalized_path)
-                            st.write(f"Path gambar lengkap: {full_path}")
                             if os.path.exists(full_path):
                                 try:
                                     image = Image.open(full_path)
-                                    st.image(image, caption=row['Nama Parfum'], use_column_width=True)
+                                    st.image(image, caption=row['Nama Parfum'], use_container_width=True)
                                 except Exception as e:
                                     st.error(f"Terjadi kesalahan saat menampilkan gambar: {e}")
                             else:
-                                st.write(f"Gambar tidak ditemukan di: {full_path}")
+                                st.write(f"Gambar tidak ditemukan.") #This line remains for error reporting.
                         else:
                             st.write("Path gambar tidak tersedia dalam data.")
                     with col2:
