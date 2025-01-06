@@ -257,22 +257,24 @@ def main():
                     col1, col2 = st.columns(2)
                     with col1:
                         if 'image_path' in row and row['image_path']:
-                            # Normalize the path and make it relative to the current directory
+                            # Normalisasi path dan buat relatif terhadap direktori saat ini
                             normalized_path = os.path.normpath(row['image_path'])
-                            # Remove the 'perfume_recommendation/' prefix if it exists
+                            # Hapus awalan 'perfume_recommendation/' jika ada
                             if normalized_path.startswith('perfume_recommendation/'):
                                 normalized_path = normalized_path[len('perfume_recommendation/'):]
+                            # Gunakan os.path.join untuk menggabungkan path dengan benar
                             full_path = os.path.join(os.path.dirname(__file__), normalized_path)
+                            st.write(f"Path gambar lengkap: {full_path}")
                             if os.path.exists(full_path):
                                 try:
                                     image = Image.open(full_path)
                                     st.image(image, caption=row['Nama Parfum'], use_column_width=True)
                                 except Exception as e:
-                                    st.error(f"Error displaying image: {e}")
+                                    st.error(f"Terjadi kesalahan saat menampilkan gambar: {e}")
                             else:
-                                st.write("Gambar tidak ditemukan di lokasi yang ditentukan.")
+                                st.write(f"Gambar tidak ditemukan di: {full_path}")
                         else:
-                            st.write("Path gambar tidak tersedia.")
+                            st.write("Path gambar tidak tersedia dalam data.")
                     with col2:
                         # Exclude 'image_path' from display
                         for column in results.columns:
