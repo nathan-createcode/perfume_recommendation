@@ -10,9 +10,10 @@ from sklearn.preprocessing import LabelEncoder
 import ast
 import logging
 import os
-import subprocess
-from dotenv import load_dotenv
 from PIL import Image
+
+# Konfigurasi logging
+logging.basicConfig(level=logging.INFO)
 
 # Pengecekan keberadaan file database
 if not os.path.exists('perfume_recommendation.db'):
@@ -27,24 +28,12 @@ else:
 def clean_price_column(df):
     try:
         df['Harga'] = df['Harga'].str.replace('Rp', '', regex=False).str.replace('.', '', regex=False)
-        df['Harga'] = pd.to_numeric(df['Harga'], errors='coerce')  # Ubah invalid value menjadi NaN
-        df = df.dropna(subset=['Harga'])  # Hapus baris dengan Harga NaN
+        df['Harga'] = pd.to_numeric(df['Harga'], errors='coerce')
+        df = df.dropna(subset=['Harga'])
         return df
     except Exception as e:
         st.error(f"Terjadi kesalahan saat membersihkan kolom 'Harga': {e}")
         return df
-
-def check_installed_packages():
-    try:
-        installed = subprocess.check_output(['pip', 'list'])
-        print(installed.decode('utf-8'))
-    except Exception as e:
-        print(f"Error checking installed packages: {e}")
-
-check_installed_packages()
-
-# Konfigurasi logging
-logging.basicConfig(level=logging.INFO)
 
 # Fungsi untuk membaca data dari database
 def get_perfume_data():
@@ -109,7 +98,7 @@ def visualize_data(df):
 def ai_model(df, model_type="regression"):
     # Preprocessing untuk model
     df = clean_price_column(df)
-    df = df.dropna(subset=['Harga'])  # Hapus baris dengan Harga NaN
+    df = df.dropna(subset=['Harga'])
 
     # Encoding untuk variabel kategorikal
     le = LabelEncoder()
@@ -171,12 +160,25 @@ def add_new_perfume(data):
         logging.error(f"Error adding new perfume: {e}")
         return False
 
+# Fungsi untuk mencari parfum
+def search_perfume(query):
+    try:
+        sql_query = """
+        SELECT * FROM perfumes
+        WHERE "Nama Parfum" LIKE ? OR "Brand atau Produsen" LIKE ? OR "Kategori Aroma" LIKE ?
+        """
+        df = pd.read_sql_query(sql_query, conn, params=[f"%{query}%"]*3)
+        return df
+    except sqlite3.Error as e:
+        logging.error(f"Error searching perfume: {e}")
+        return pd.DataFrame()
+
 # Fungsi utama aplikasi
 def main():
     st.title("Aplikasi Rekomendasi Parfum")
 
     menu = ["Home", "Search Perfume", "Add New Perfume", "AI Model"]
-    choice = st.sidebar.selectbox("Menu", menu, key="menu_selectbox")
+    choice = st.sidebar.selectbox("Menu", menu)
 
     df = get_perfume_data()
     if not df.empty:
@@ -184,41 +186,19 @@ def main():
 
     if choice == "Home":
         st.write("Selamat datang di Aplikasi Rekomendasi Parfum!")
-
-        # Bagian Edukasi tentang Parfum
-        st.subheader("Edukasi tentang Parfum")
-        st.write("""
-        🌸 **Kategori Aroma Parfum**
-
-        Parfum memiliki berbagai kategori aroma yang unik, seperti:
-        - **Floral**: Aroma bunga-bungaan yang lembut dan feminin.
-        - **Woody**: Aroma kayu-kayuan yang hangat dan maskulin.
-        - **Oriental**: Aroma rempah-rempah eksotis yang sensual.
-        - **Fresh**: Aroma segar seperti citrus atau air laut.
-        - **Gourmand**: Aroma manis seperti vanila atau karamel.
-
-        🎵 **Struktur Aroma Parfum**
-
-        Parfum memiliki tiga lapisan aroma yang berbeda:
-        1. **Top Notes**: Aroma pertama yang tercium, biasanya ringan dan segar.
-        2. **Middle Notes**: Aroma yang muncul setelah top notes menghilang, membentuk "jantung" parfum.
-        3. **Base Notes**: Aroma yang bertahan paling lama, memberikan kedalaman pada parfum.
-
-        💧 **Konsentrasi Parfum**
-
-        - **Parfum (P)**: Konsentrasi tertinggi (20-30%), bertahan 6-8 jam.
-        - **Eau de Parfum (EDP)**: Konsentrasi 15-20%, bertahan 4-5 jam.
-        - **Eau de Toilette (EDT)**: Konsentrasi 5-15%, bertahan 2-3 jam.
-        - **Eau de Cologne (EDC)**: Konsentrasi 2-4%, bertahan 2 jam.
-        - **Eau Fraiche**: Konsentrasi terendah (1-3%), bertahan 1 jam.
-
-        Semakin tinggi konsentrasinya, semakin kuat dan tahan lama aromanya!
-        """)
-
-        # Tampilkan Visualisasi Data
         visualize_data(df)
 
-    if choice == "Add New Perfume":
+    elif choice == "Search Perfume":
+        st.subheader("Cari Parfum")
+        search_query = st.text_input("Masukkan nama parfum, brand, atau kategori aroma:")
+        if search_query:
+            results = search_perfume(search_query)
+            if not results.empty:
+                st.write(results)
+            else:
+                st.write("Tidak ada hasil yang ditemukan.")
+
+    elif choice == "Add New Perfume":
         st.subheader("Tambah Parfum Baru")
         nama = st.text_input("Nama Parfum")
         brand = st.text_input("Brand atau Produsen")
@@ -236,7 +216,7 @@ def main():
         image = st.file_uploader("Upload Gambar Parfum", type=['png', 'jpg', 'jpeg'])
 
         if st.button("Tambah Parfum"):
-            if nama and brand:  # Minimal nama dan brand harus diisi
+            if nama and brand:
                 if image:
                     image_path = os.path.join("img", image.name)
                     with open(image_path, "wb") as f:
@@ -245,7 +225,7 @@ def main():
                     image_path = ""
 
                 new_perfume = {
-                    "NamaParfum": nama,
+                    "Nama Parfum": nama,
                     "Brand atau Produsen": brand,
                     "Jenis": jenis,
                     "Kategori Aroma": kategori,
@@ -266,7 +246,7 @@ def main():
                 else:
                     st.error("Terjadi kesalahan saat menambahkan parfum baru.")
 
-    if choice == "AI Model":
+    elif choice == "AI Model":
         st.subheader("Pemodelan AI untuk Prediksi")
         model_type = st.radio("Pilih Tipe Model", ("regression", "classification"))
         ai_model(df, model_type)
@@ -278,6 +258,7 @@ if __name__ == "__main__":
         logging.error(f"Error in main: {e}")
         st.error("Aplikasi mengalami error. Silakan cek log untuk detailnya.")
     finally:
-        # Pastikan koneksi database ditutup setelah aplikasi selesai
         if 'conn' in globals() and conn:
             conn.close()
+
+print("Aplikasi Rekomendasi Parfum berhasil dijalankan!")
