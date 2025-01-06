@@ -208,7 +208,7 @@ def main():
     st.title("Aplikasi Rekomendasi Parfum")
 
     menu = ["Home", "Search Perfume", "Consult with ChatGPT", "Add New Perfume"]
-    choice = st.sidebar.selectbox("Menu", menu, key="main_menu_selectbox")
+    choice = st.sidebar.selectbox("Menu", menu, key="menu_selectbox")
 
     df = get_perfume_data()
     if not df.empty:
@@ -250,11 +250,10 @@ def main():
         Semakin tinggi konsentrasinya, semakin kuat dan tahan lama aromanya!
         """)
 
-    elif choice == "Search Perfume":
-        st.subheader("Cari Parfum")
-        description = st.text_area("Masukkan deskripsi parfum yang Anda inginkan:")
+    if choice == "Search Perfume":
+        description = st.text_area("Masukkan deskripsi parfum yang Anda inginkan:", key="description_textarea")
         gender = st.selectbox("Pilih Gender", ["All", "Male", "Female", "Unisex"], key="gender_selectbox")
-        max_price = st.number_input("Harga Maksimum (dalam Rupiah)", min_value=0, max_value=7000000, value=1000000, step=100000)
+        max_price = st.number_input("Harga Maksimum (dalam Rupiah)", min_value=0, max_value=7000000, value=1000000, step=100000, key="max_price_input")
 
     if st.button("Cari"):
         # Validasi data sebelum pencarian
