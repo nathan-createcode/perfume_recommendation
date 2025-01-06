@@ -15,15 +15,30 @@ from PIL import Image
 # Konfigurasi logging
 logging.basicConfig(level=logging.INFO)
 
-# Pengecekan keberadaan file database
-if not os.path.exists('perfume_recommendation.db'):
-    st.error("Database tidak ditemukan. Pastikan file `perfume_recommendation.db` ada di direktori.")
-else:
-    try:
-        conn = sqlite3.connect('perfume_recommendation.db')
-        cursor = conn.cursor()
-    except sqlite3.Error as e:
-        st.error(f"Terjadi kesalahan saat menghubungkan ke database: {e}")
+# Fungsi untuk mendapatkan koneksi database
+def get_db_connection():
+    return sqlite3.connect('perfume_recommendation.db', check_same_thread=False)
+
+# Gunakan st.cache_resource untuk menyimpan koneksi database
+@st.cache_resource
+def init_db_connection():
+    return get_db_connection()
+
+# Inisialisasi koneksi database
+conn = init_db_connection()
+
+# Fungsi untuk menutup koneksi database
+def close_db_connection():
+    if 'conn' in globals():
+        conn.close()
+        logging.info("Database connection closed")
+
+# Daftarkan fungsi close_db_connection untuk dijalankan saat aplikasi ditutup
+st.session_state.setdefault('db_connection_closed', False)
+if not st.session_state.db_connection_closed:
+    st.session_state.db_connection_closed = True
+    st.on_session_end(close_db_connection)
+
 
 def clean_price_column(df):
     try:
@@ -154,13 +169,12 @@ def add_new_perfume(data):
     """
     try:
         logging.info(f"Attempting to add new perfume: {data}")
-        cursor.execute(query, tuple(data.values()))
-        conn.commit()
+        with conn:  # This ensures that changes are committed
+            conn.execute(query, tuple(data.values()))
         logging.info("New perfume added successfully")
         return True
     except sqlite3.Error as e:
         logging.error(f"Error adding new perfume: {e}")
-        conn.rollback()
         return False
 
 def normalize_price(price_str):
