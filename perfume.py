@@ -16,18 +16,26 @@ import os
 import subprocess
 import traceback
 
-def clean_price_column(df):
-    """
-    Membersihkan kolom 'Harga' agar hanya berisi angka float.
-    Menghapus 'Rp' dan titik sebagai pemisah ribuan.
-    """
+# pengecekan keberadaan file database sebelum koneksi dilakukan
+if not os.path.exists('perfume_recommendation.db'):
+    st.error("Database tidak ditemukan. Pastikan file `perfume_recommendation.db` ada di direktori.")
+else:
     try:
-        df['Harga'] = df['Harga'].str.replace('Rp', '', regex=False).str.replace('.', '', regex=False).astype(float)
+        conn = sqlite3.connect('perfume_recommendation.db')
+        cursor = conn.cursor()
+    except sqlite3.Error as e:
+        st.error(f"Terjadi kesalahan saat menghubungkan ke database: {e}")
+
+
+def clean_price_column(df):
+    try:
+        df['Harga'] = df['Harga'].str.replace('Rp', '', regex=False).str.replace('.', '', regex=False)
+        df['Harga'] = pd.to_numeric(df['Harga'], errors='coerce')  # Ubah invalid value menjadi NaN
+        df = df.dropna(subset=['Harga'])  # Hapus baris dengan Harga NaN
         return df
     except Exception as e:
         st.error(f"Terjadi kesalahan saat membersihkan kolom 'Harga': {e}")
         return df
-
 
 # Install matplotlib jika belum terinstal
 try:
@@ -200,7 +208,7 @@ def main():
     st.title("Aplikasi Rekomendasi Parfum")
 
     menu = ["Home", "Search Perfume", "Consult with ChatGPT", "Add New Perfume"]
-    choice = st.sidebar.selectbox("Menu", menu)
+    choice = st.sidebar.selectbox("Menu", menu, key="main_menu_selectbox")
 
     df = get_perfume_data()
     if not df.empty:
@@ -245,20 +253,20 @@ def main():
     elif choice == "Search Perfume":
         st.subheader("Cari Parfum")
         description = st.text_area("Masukkan deskripsi parfum yang Anda inginkan:")
-        gender = st.selectbox("Pilih Gender", ["All", "Male", "Female", "Unisex"])
+        gender = st.selectbox("Pilih Gender", ["All", "Male", "Female", "Unisex"], key="gender_selectbox")
         max_price = st.number_input("Harga Maksimum (dalam Rupiah)", min_value=0, max_value=7000000, value=1000000, step=100000)
 
     if st.button("Cari"):
-            # Validasi data
-            if 'Harga' in df.columns:
-                if df['Harga'].isnull().any():
-                    st.warning("Beberapa data di kolom 'Harga' kosong. Periksa kembali data Anda.")
-                if not df['Harga'].apply(lambda x: isinstance(x, (int, float))).all():
-                    st.warning("Kolom 'Harga' mengandung nilai yang tidak valid. Data tidak dapat diproses.")
-                    return
-            else:
-                st.error("Kolom 'Harga' tidak ditemukan dalam database. Tidak dapat melanjutkan pencarian.")
-                return
+        # Validasi data sebelum pencarian
+        if df.empty:
+            st.error("Tidak ada data yang tersedia untuk pencarian.")
+            return
+        if 'Harga' not in df.columns:
+            st.error("Kolom 'Harga' tidak ditemukan. Tidak dapat melanjutkan pencarian.")
+            return
+        if df['Harga'].isnull().any():
+            st.warning("Beberapa data di kolom 'Harga' kosong. Periksa kembali data Anda.")
+            return
 
             # Bersihkan data harga
             df = clean_price_column(df)
@@ -348,14 +356,13 @@ def main():
                 st.warning("Nama Parfum dan Brand atau Produsen harus diisi.")
 
 if __name__ == "__main__":
-    main()
-
-try:
-    main()
-except Exception as e:
-    logging.error(f"Error in main: {e}")
-    st.error("Aplikasi mengalami error. Silakan cek log untuk detailnya.")
-    traceback.print_exc()
-
-# Tutup koneksi database saat aplikasi selesai
-conn.close()
+    try:
+        main()
+    except Exception as e:
+        logging.error(f"Error in main: {e}")
+        st.error("Aplikasi mengalami error. Silakan cek log untuk detailnya.")
+        traceback.print_exc()
+    finally:
+        # Pastikan koneksi database ditutup setelah aplikasi selesai
+        if 'conn' in globals() and conn:
+            conn.close()
