@@ -18,16 +18,24 @@ logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('app.log'),
+        logging.FileHandler('app.log', mode='a'),
         logging.StreamHandler()
     ]
 )
 
-# Fungsi untuk mendapatkan koneksi database
+# Fungsi untuk mendapatkan koneksi database dengan pengaturan yang diperbarui
 def get_db_connection():
     try:
         conn = sqlite3.connect('perfume_recommendation.db', check_same_thread=False)
         conn.row_factory = sqlite3.Row
+
+        # Nonaktifkan write-ahead logging
+        conn.execute("PRAGMA journal_mode=DELETE")
+        # Aktifkan synchronous mode
+        conn.execute("PRAGMA synchronous=FULL")
+        # Aktifkan foreign key constraints
+        conn.execute("PRAGMA foreign_keys=ON")
+
         logging.info("Database connection established successfully")
         return conn
     except Error as e:
@@ -185,7 +193,6 @@ def add_new_perfume(data):
         st.error("Tidak dapat terhubung ke database.")
         return False
 
-    # Hitung jumlah parfum sebelum penambahan
     try:
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM perfumes")
@@ -203,8 +210,8 @@ def add_new_perfume(data):
 
         logging.info(f"Memulai transaksi untuk menambah parfum baru: {data['Nama Parfum']}")
 
-        # Mulai transaksi
-        conn.execute("BEGIN TRANSACTION")
+        # Mulai transaksi dengan IMMEDIATE untuk mengunci database
+        conn.execute("BEGIN IMMEDIATE TRANSACTION")
 
         # Eksekusi query insert
         cursor.execute(query, tuple(data.values()))
@@ -225,7 +232,12 @@ def add_new_perfume(data):
             if new_perfume:
                 logging.info(f"Data parfum baru berhasil diverifikasi: {new_perfume}")
                 conn.commit()
-                logging.info("Transaksi berhasil di-commit")
+
+                # Paksa flush ke disk
+                conn.execute("PRAGMA wal_checkpoint")
+                conn.execute("VACUUM")
+
+                logging.info("Transaksi berhasil di-commit dan di-flush ke disk")
                 return True
             else:
                 logging.error("Data parfum baru tidak ditemukan setelah insert")
@@ -290,6 +302,24 @@ def check_database_status():
     except sqlite3.Error as e:
         logging.error(f"Error saat memeriksa status database: {e}")
         return None
+    finally:
+        close_db_connection(conn)
+
+# Tambahan fungsi untuk memastikan database tersimpan
+def ensure_database_saved():
+    conn = get_db_connection()
+    if not conn:
+        return False
+
+    try:
+        # Paksa semua perubahan tersimpan ke disk
+        conn.execute("PRAGMA wal_checkpoint")
+        conn.execute("VACUUM")
+        conn.commit()
+        return True
+    except sqlite3.Error as e:
+        logging.error(f"Error ensuring database saved: {e}")
+        return False
     finally:
         close_db_connection(conn)
 
@@ -494,6 +524,10 @@ def main():
                     }
 
                     if add_new_perfume(new_perfume):
+                      if ensure_database_saved():
+                        st.success("Parfum baru berhasil ditambahkan dan tersimpan ke database!")
+                    else:
+                        st.warning("Parfum berhasil ditambahkan tetapi mungkin belum tersimpan permanen. Silakan cek database.")
                         st.success("Parfum baru berhasil ditambahkan!")
 
                         # Tampilkan status database setelah penambahan
@@ -511,8 +545,8 @@ def main():
                                 st.warning("Jumlah parfum tidak bertambah setelah penambahan")
 
                         logging.info(f"New perfume added: {new_perfume}")
-                    else:
-                        st.error("Terjadi kesalahan saat menambahkan parfum baru. Silakan cek log untuk detailnya.")
+                    # else:
+                    #     st.error("Terjadi kesalahan saat menambahkan parfum baru. Silakan cek log untuk detailnya.")
             else:
                 st.error("Nama Parfum dan Brand harus diisi.")
 
