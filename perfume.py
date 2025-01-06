@@ -524,11 +524,10 @@ def main():
                     }
 
                     if add_new_perfume(new_perfume):
-                      if ensure_database_saved():
-                        st.success("Parfum baru berhasil ditambahkan dan tersimpan ke database!")
-                    else:
-                        st.warning("Parfum berhasil ditambahkan tetapi mungkin belum tersimpan permanen. Silakan cek database.")
-                        st.success("Parfum baru berhasil ditambahkan!")
+                        if ensure_database_saved():
+                            st.success("Parfum baru berhasil ditambahkan dan tersimpan ke database!")
+                        else:
+                            st.warning("Parfum berhasil ditambahkan tetapi mungkin belum tersimpan permanen. Silakan cek database.")
 
                         # Tampilkan status database setelah penambahan
                         st.write("Status Database Setelah Penambahan:")
@@ -545,8 +544,8 @@ def main():
                                 st.warning("Jumlah parfum tidak bertambah setelah penambahan")
 
                         logging.info(f"New perfume added: {new_perfume}")
-                    # else:
-                    #     st.error("Terjadi kesalahan saat menambahkan parfum baru. Silakan cek log untuk detailnya.")
+                    else:
+                        st.error("Terjadi kesalahan saat menambahkan parfum baru. Silakan cek log untuk detailnya.")
             else:
                 st.error("Nama Parfum dan Brand harus diisi.")
 
