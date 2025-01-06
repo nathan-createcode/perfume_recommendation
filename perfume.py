@@ -224,7 +224,6 @@ def main():
         with col2:
             daya_tahan = st.selectbox("Daya Tahan", ["", "Pendek", "Sedang", "Lama", "Sangat Lama"])
             musim = st.selectbox("Musim atau Cuaca", ["", "Semua Musim", "Musim Panas", "Musim Dingin", "Musim Semi", "Musim Gugur", "Malam Hari"])
-            min_harga = st.text_input("Harga Minimum (contoh: Rp1.500.000)", "")
             max_harga = st.text_input("Harga Maksimum (contoh: Rp10.000.000)", "")
 
         filters = {
@@ -233,7 +232,7 @@ def main():
             'kekuatan_aroma': kekuatan_aroma,
             'daya_tahan': daya_tahan,
             'musim': musim,
-            'min_harga': min_harga,
+            # 'min_harga': min_harga,
             'max_harga': max_harga
         }
 
