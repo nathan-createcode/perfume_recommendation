@@ -209,8 +209,22 @@ def search_perfume(query, filters):
         logging.error(f"Error searching perfume: {e}")
         return pd.DataFrame()
 
+def normalize_image_path(path):
+    # Ubah backslash menjadi forward slash
+    normalized = path.replace('\\', '/')
+    # Hapus awalan 'perfume_recommendation/' jika ada
+    if normalized.startswith('perfume_recommendation/'):
+        normalized = normalized[len('perfume_recommendation/'):]
+    return normalized
+
 # Fungsi utama aplikasi
 def main():
+    st.write(f"Direktori kerja saat ini: {os.getcwd()}")
+    st.write(f"Isi direktori saat ini: {os.listdir('.')}")
+    if os.path.exists('img'):
+        st.write(f"Isi direktori img: {os.listdir('img')}")
+    else:
+        st.write("Direktori 'img' tidak ditemukan.")
     st.title("Aplikasi Rekomendasi Parfum")
 
     menu = ["Home", "Search Perfume", "Add New Perfume", "AI Model"]
@@ -257,13 +271,8 @@ def main():
                     col1, col2 = st.columns(2)
                     with col1:
                         if 'image_path' in row and row['image_path']:
-                            # Normalisasi path dan buat relatif terhadap direktori saat ini
-                            normalized_path = os.path.normpath(row['image_path'])
-                            # Hapus awalan 'perfume_recommendation/' jika ada
-                            if normalized_path.startswith('perfume_recommendation/'):
-                                normalized_path = normalized_path[len('perfume_recommendation/'):]
-                            # Gunakan os.path.join untuk menggabungkan path dengan benar
-                            full_path = os.path.join(os.path.dirname(__file__), normalized_path)
+                            normalized_path = normalize_image_path(row['image_path'])
+                            full_path = os.path.join(os.getcwd(), normalized_path)
                             st.write(f"Path gambar lengkap: {full_path}")
                             if os.path.exists(full_path):
                                 try:
