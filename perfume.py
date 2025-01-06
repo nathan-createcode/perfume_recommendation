@@ -153,18 +153,21 @@ def add_new_perfume(data):
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
     try:
+        logging.info(f"Attempting to add new perfume: {data}")
         cursor.execute(query, tuple(data.values()))
         conn.commit()
+        logging.info("New perfume added successfully")
         return True
     except sqlite3.Error as e:
         logging.error(f"Error adding new perfume: {e}")
+        conn.rollback()
         return False
 
 def normalize_price(price_str):
     if not price_str:
         return None
-    # Remove 'Rp' and any dots or spaces
-    price_str = price_str.replace('Rp', '').replace('.', '').replace(' ', '')
+    # Remove 'Rp', dots, spaces, and commas
+    price_str = price_str.replace('Rp', '').replace('.', '').replace(' ', '').replace(',', '')
     try:
         # Convert to integer
         price = int(price_str)
@@ -182,6 +185,12 @@ def search_perfume(query, filters):
         """
         params = []
 
+        if filters['nama_parfum']:
+            sql_query += " AND \"Nama Parfum\" LIKE ?"
+            params.append(f"%{filters['nama_parfum']}%")
+        if filters['brand']:
+            sql_query += " AND \"Brand atau Produsen\" LIKE ?"
+            params.append(f"%{filters['brand']}%")
         if filters['gender']:
             sql_query += " AND Gender = ?"
             params.append(filters['gender'])
@@ -237,22 +246,25 @@ def main():
 
         col1, col2 = st.columns(2)
         with col1:
+            nama_parfum = st.text_input("Nama Parfum", key="nama_parfum_filter")
+            brand = st.text_input("Brand atau Produsen", key="brand_filter")
             gender = st.selectbox("Gender", ["", "Female", "Male", "Unisex"], key="gender_filter")
             jenis = st.selectbox("Jenis", ["", "EDP", "EDT", "EDC", "Perfume", "Extrait de Parfum", "Parfum Cologne"], key="jenis_filter")
-            kekuatan_aroma = st.selectbox("Kekuatan Aroma", ["", "Ringan", "Sedang", "Kuat", "Sangat Kuat"], key="kekuatan_aroma_filter")
 
         with col2:
+            kekuatan_aroma = st.selectbox("Kekuatan Aroma", ["", "Ringan", "Sedang", "Kuat", "Sangat Kuat"], key="kekuatan_aroma_filter")
             daya_tahan = st.selectbox("Daya Tahan", ["", "Pendek", "Sedang", "Lama", "Sangat Lama"], key="daya_tahan_filter")
             musim = st.selectbox("Musim atau Cuaca", ["", "Semua Musim", "Musim Panas", "Musim Dingin", "Musim Semi", "Musim Gugur", "Malam Hari"], key="musim_filter")
             harga = st.text_input("Batas Harga (contoh: Rp7.000.000)", "")
 
         filters = {
+            'nama_parfum': nama_parfum,
+            'brand': brand,
             'gender': gender,
             'jenis': jenis,
             'kekuatan_aroma': kekuatan_aroma,
             'daya_tahan': daya_tahan,
             'musim': musim,
-            'min_harga': None,
             'max_harga': harga
         }
 
@@ -274,11 +286,10 @@ def main():
                                 except Exception as e:
                                     st.error(f"Terjadi kesalahan saat menampilkan gambar: {e}")
                             else:
-                                st.write(f"Gambar tidak ditemukan.") #This line remains for error reporting.
+                                st.write(f"Gambar tidak ditemukan.")
                         else:
                             st.write("Path gambar tidak tersedia dalam data.")
                     with col2:
-                        # Exclude 'image_path' from display
                         for column in results.columns:
                             if column not in ['Nama Parfum', 'image_path', 'created_at', 'updated_at']:
                                 st.write(f"**{column}:** {row[column]}")
@@ -298,7 +309,7 @@ def main():
         kekuatan = st.selectbox("Kekuatan Aroma", ["Ringan", "Sedang", "Kuat", "Sangat Kuat"], key="kekuatan_aroma")
         daya_tahan = st.selectbox("Daya Tahan", ["Pendek", "Sedang", "Lama", "Sangat Lama"], key="daya_tahan")
         musim = st.selectbox("Musim atau Cuaca", ["Semua Musim", "Musim Panas", "Musim Dingin", "Musim Semi", "Musim Gugur", "Malam Hari"], key="musim")
-        harga = st.text_input("Harga (format: Rp X.XXX.XXX)")
+        harga = st.text_input("Harga (contoh: 7000000, 7.000.000, atau Rp7.000.000)")
         ukuran = st.text_input("Ukuran Botol")
         gender = st.selectbox("Gender", ["Female", "Male", "Unisex"])
         image = st.file_uploader("Upload Gambar Parfum", type=['png', 'jpg', 'jpeg'])
@@ -313,27 +324,35 @@ def main():
                 else:
                     image_path = ""
 
-                new_perfume = {
-                    "Nama Parfum": nama,
-                    "Brand atau Produsen": brand,
-                    "Jenis": jenis,
-                    "Kategori Aroma": kategori,
-                    "Top Notes": str(top_notes.split(',')),
-                    "Middle Notes": str(middle_notes.split(',')),
-                    "Base Notes": str(base_notes.split(',')),
-                    "Kekuatan Aroma": kekuatan,
-                    "Daya Tahan": daya_tahan,
-                    "Musim atau Cuaca": musim,
-                    "Harga": harga,
-                    "Ukuran Botol": ukuran,
-                    "image_path": image_path,
-                    "Gender": gender
-                }
-
-                if add_new_perfume(new_perfume):
-                    st.success("Parfum baru berhasil ditambahkan!")
+                normalized_harga = normalize_price(harga)
+                if not normalized_harga:
+                    st.error("Format harga tidak valid. Harap masukkan harga dalam format yang benar.")
                 else:
-                    st.error("Terjadi kesalahan saat menambahkan parfum baru.")
+                    new_perfume = {
+                        "Nama Parfum": nama,
+                        "Brand atau Produsen": brand,
+                        "Jenis": jenis,
+                        "Kategori Aroma": kategori,
+                        "Top Notes": str(top_notes.split(',')),
+                        "Middle Notes": str(middle_notes.split(',')),
+                        "Base Notes": str(base_notes.split(',')),
+                        "Kekuatan Aroma": kekuatan,
+                        "Daya Tahan": daya_tahan,
+                        "Musim atau Cuaca": musim,
+                        "Harga": normalized_harga,
+                        "Ukuran Botol": ukuran,
+                        "image_path": image_path,
+                        "Gender": gender
+                    }
+
+                    if add_new_perfume(new_perfume):
+                        st.success("Parfum baru berhasil ditambahkan!")
+                        logging.info(f"New perfume added: {new_perfume}")
+                    else:
+                        st.error("Terjadi kesalahan saat menambahkan parfum baru. Silakan cek log untuk detailnya.")
+            else:
+                st.error("Nama Parfum dan Brand harus diisi.")
+
 
     elif choice == "AI Model":
         st.subheader("Pemodelan AI untuk Prediksi")
@@ -349,6 +368,7 @@ if __name__ == "__main__":
     finally:
         if 'conn' in globals() and conn:
             conn.close()
+            logging.info("Database connection closed")
 
 print("Aplikasi Rekomendasi Parfum berhasil dijalankan!")
 
