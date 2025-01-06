@@ -8,30 +8,29 @@ from sklearn.metrics.pairwise import cosine_similarity
 import openai
 import os
 from PIL import Image
-from PIL import features
 import ast
 import logging
 from dotenv import load_dotenv
-import os
 import subprocess
 import traceback
 
-# pengecekan keberadaan file database sebelum koneksi dilakukan
-if not os.path.exists('perfume_recommendation.db'):
-    st.error("Database tidak ditemukan. Pastikan file `perfume_recommendation.db` ada di direktori.")
-else:
+# Pengecekan keberadaan file database sebelum koneksi dilakukan
+def connect_to_database(db_path):
     try:
-        conn = sqlite3.connect('perfume_recommendation.db')
-        cursor = conn.cursor()
+        if not os.path.exists(db_path):
+            st.error("Database tidak ditemukan. Pastikan file `perfume_recommendation.db` ada di direktori.")
+            return None
+        conn = sqlite3.connect(db_path)
+        return conn
     except sqlite3.Error as e:
         st.error(f"Terjadi kesalahan saat menghubungkan ke database: {e}")
+        return None
 
-
+# Pembersihan Kolom Harga
 def clean_price_column(df):
     try:
-        df['Harga'] = df['Harga'].str.replace('Rp', '', regex=False).str.replace('.', '', regex=False)
-        df['Harga'] = pd.to_numeric(df['Harga'], errors='coerce')  # Ubah invalid value menjadi NaN
-        df = df.dropna(subset=['Harga'])  # Hapus baris dengan Harga NaN
+        df['Harga'] = df['Harga'].replace({'Rp': '', '.': ''}, regex=True).astype(float)
+        df = df.dropna(subset=['Harga'])  # Hapus baris dengan harga NaN
         return df
     except Exception as e:
         st.error(f"Terjadi kesalahan saat membersihkan kolom 'Harga': {e}")
@@ -44,34 +43,26 @@ except ModuleNotFoundError:
     subprocess.check_call([os.sys.executable, "-m", "pip", "install", "matplotlib"])
     import matplotlib.pyplot as plt
 
+# Pengecekan Zlib
+from PIL import features
 print("zlib available:", features.check('zlib'))
 
+# Cek Paket yang Terinstal
 def check_installed_packages():
     try:
         installed = subprocess.check_output(['pip', 'list'])
         print(installed.decode('utf-8'))
     except Exception as e:
-        print(f"Error checking installed packages: {e}")
+        logging.error(f"Error checking installed packages: {e}")
 
 check_installed_packages()
-
-# Konfigurasi logging
-logging.basicConfig(level=logging.INFO)
 
 # Konfigurasi OpenAI API
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # Koneksi ke database
-try:
-    conn = sqlite3.connect('perfume_recommendation.db')
-    cursor = conn.cursor()
-except sqlite3.Error as e:
-    logging.error(f"Error connecting to database: {e}")
-    st.error("Terjadi kesalahan saat menghubungkan ke database.")
-
-if not os.path.exists('perfume_recommendation.db'):
-    st.error("Database tidak ditemukan. Pastikan file `perfume_recommendation.db` ada di direktori.")
+conn = connect_to_database('perfume_recommendation.db')
 
 # Fungsi untuk membaca data dari database
 def get_perfume_data():
@@ -89,15 +80,14 @@ def get_perfume_data():
         st.error("Terjadi kesalahan saat membaca data dari database.")
         return pd.DataFrame()
 
-# Fungsi untuk membersihkan data
+# Fungsi untuk membersihkan data (berkaitan dengan literal_eval)
 def clean_data(df):
     def safe_eval(x):
         if isinstance(x, str):
             try:
                 return ast.literal_eval(x)
             except (ValueError, SyntaxError):
-                # Jika gagal, kembalikan string asli
-                return x
+                return x  # Jika gagal, kembalikan string asli
         return x
 
     for col in ['Top Notes', 'Middle Notes', 'Base Notes']:
@@ -135,80 +125,38 @@ def visualize_data(df):
 
 # Fungsi untuk mencari parfum dengan Cosine Similarity
 def search_perfume_cosine(df, description, gender, max_price):
-    # Gabungkan beberapa kolom yang relevan untuk pencarian
-    df['combined_text'] = df['Nama Parfum'] + ' ' + df['Brand atau Produsen'] + ' ' + df['Kategori Aroma'] + ' ' + df['Top Notes'].astype(str) + ' ' + df['Middle Notes'].astype(str) + ' ' + df['Base Notes'].astype(str)
-
+    df['combined_text'] = df['Nama Parfum'] + ' ' + df['Brand atau Produsen'] + ' ' + df['Kategori Aroma'] + ' ' + df['Top Notes'].astype(str) + ' ' + df['Middle Notes'].astype(str) + ' ' + df['Base Notes'].astype(str) + ' ' + df['Harga'].astype(str) + ' ' + df['Gender'].astype(str)
     tfidf = TfidfVectorizer(stop_words='english')
     tfidf_matrix = tfidf.fit_transform(df['combined_text'])
-
     user_vector = tfidf.transform([description])
     cosine_similarities = cosine_similarity(user_vector, tfidf_matrix).flatten()
 
     df['similarity'] = cosine_similarities
+    df = clean_price_column(df)
     filtered_df = df[df['Gender'].str.contains(gender, case=False, na=False)] if gender != 'All' else df
-    filtered_df = filtered_df[filtered_df['Harga'].str.replace('Rp', '').str.replace('.', '').astype(float) <= float(max_price)]
-
+    filtered_df = filtered_df[filtered_df['Harga'] <= max_price]
     results = filtered_df.sort_values('similarity', ascending=False).head(10)
     return results
-
-# Fungsi untuk mencari parfum dengan ChatGPT
-def search_perfume_chatgpt(description, gender, max_price):
-    prompt = f"Berdasarkan deskripsi: '{description}', untuk gender: {gender}, dengan harga maksimum: Rp{max_price}, berikan rekomendasi parfum yang sesuai beserta penjelasannya."
-
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "Anda adalah seorang ahli parfum yang memberikan rekomendasi berdasarkan preferensi pelanggan."},
-                {"role": "user", "content": prompt}
-            ]
-        )
-        return response.choices[0].message['content']
-    except openai.error.OpenAIError as e:
-        logging.error(f"Error in ChatGPT API call: {e}")
-        return "Maaf, terjadi kesalahan saat berkomunikasi dengan ChatGPT."
 
 # Fungsi untuk konsultasi dengan ChatGPT
 def consult_chatgpt(question):
     prompt = f"Pertanyaan tentang parfum: {question}"
-
     try:
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "Anda adalah seorang ahli parfum yang menjawab pertanyaan seputar parfum."},
-                {"role": "user", "content": prompt}
-            ]
+            messages=[{"role": "system", "content": "Anda adalah seorang ahli parfum yang menjawab pertanyaan seputar parfum."},
+                      {"role": "user", "content": prompt}]
         )
         return response.choices[0].message['content']
     except openai.error.OpenAIError as e:
         logging.error(f"Error in ChatGPT API call: {e}")
         return "Maaf, terjadi kesalahan saat berkomunikasi dengan ChatGPT."
 
-# Fungsi untuk menambahkan parfum baru
-def add_new_perfume(data):
-    query = """
-    INSERT INTO perfumes (
-        "Nama Parfum", "Brand atau Produsen", "Jenis", "Kategori Aroma",
-        "Top Notes", "Middle Notes", "Base Notes", "Kekuatan Aroma",
-        "Daya Tahan", "Musim atau Cuaca", "Harga", "Ukuran Botol",
-        "image_path", "Gender"
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """
-    try:
-        cursor.execute(query, tuple(data.values()))
-        conn.commit()
-        return True
-    except sqlite3.Error as e:
-        logging.error(f"Error adding new perfume: {e}")
-        return False
-
 # Fungsi utama aplikasi
 def main():
     st.title("Aplikasi Rekomendasi Parfum")
-
     menu = ["Home", "Search Perfume", "Consult with ChatGPT", "Add New Perfume"]
-    choice = st.sidebar.selectbox("Menu", menu, key="menu_selectbox")
+    choice = st.sidebar.selectbox("Menu", menu)
 
     df = get_perfume_data()
     if not df.empty:
@@ -221,59 +169,15 @@ def main():
         else:
             st.warning("Tidak ada data parfum yang tersedia.")
 
-        st.subheader("Edukasi tentang Parfum")
-        st.write("""
-        🌸 **Kategori Aroma Parfum**
-
-        Parfum memiliki berbagai kategori aroma yang unik, seperti:
-        - **Floral**: Aroma bunga-bungaan yang lembut dan feminin.
-        - **Woody**: Aroma kayu-kayuan yang hangat dan maskulin.
-        - **Oriental**: Aroma rempah-rempah eksotis yang sensual.
-        - **Fresh**: Aroma segar seperti citrus atau air laut.
-        - **Gourmand**: Aroma manis seperti vanila atau karamel.
-
-        🎵 **Struktur Aroma Parfum**
-
-        Parfum memiliki tiga lapisan aroma yang berbeda:
-        1. **Top Notes**: Aroma pertama yang tercium, biasanya ringan dan segar.
-        2. **Middle Notes**: Aroma yang muncul setelah top notes menghilang, membentuk "jantung" parfum.
-        3. **Base Notes**: Aroma yang bertahan paling lama, memberikan kedalaman pada parfum.
-
-        💧 **Konsentrasi Parfum**
-
-        - **Parfum (P)**: Konsentrasi tertinggi (20-30%), bertahan 6-8 jam.
-        - **Eau de Parfum (EDP)**: Konsentrasi 15-20%, bertahan 4-5 jam.
-        - **Eau de Toilette (EDT)**: Konsentrasi 5-15%, bertahan 2-3 jam.
-        - **Eau de Cologne (EDC)**: Konsentrasi 2-4%, bertahan 2 jam.
-        - **Eau Fraiche**: Konsentrasi terendah (1-3%), bertahan 1 jam.
-
-        Semakin tinggi konsentrasinya, semakin kuat dan tahan lama aromanya!
-        """)
-
     if choice == "Search Perfume":
-        description = st.text_area("Masukkan deskripsi parfum yang Anda inginkan:", key="description_textarea")
-        gender = st.selectbox("Pilih Gender", ["All", "Male", "Female", "Unisex"], key="gender_selectbox")
-        max_price = st.number_input("Harga Maksimum (dalam Rupiah)", min_value=0, max_value=7000000, value=1000000, step=100000, key="max_price_input")
+        description = st.text_area("Masukkan deskripsi parfum yang Anda inginkan:")
+        gender = st.selectbox("Pilih Gender", ["All", "Male", "Female", "Unisex"])
+        max_price = st.number_input("Harga Maksimum (dalam Rupiah)", min_value=0, max_value=7000000, value=1000000, step=100000)
 
-    if st.button("Cari"):
-        # Validasi data sebelum pencarian
-        if df.empty:
-            st.error("Tidak ada data yang tersedia untuk pencarian.")
-            return
-        if 'Harga' not in df.columns:
-            st.error("Kolom 'Harga' tidak ditemukan. Tidak dapat melanjutkan pencarian.")
-            return
-        if df['Harga'].isnull().any():
-            st.warning("Beberapa data di kolom 'Harga' kosong. Periksa kembali data Anda.")
-            return
-
-            # Bersihkan data harga
-            df = clean_price_column(df)
-
+        if st.button("Cari"):
+            logging.info(f"Deskripsi: {description}, Gender: {gender}, Harga Maks: {max_price}")
             if not df.empty:
                 cosine_results = search_perfume_cosine(df, description, gender, max_price)
-                chatgpt_results = search_perfume_chatgpt(description, gender, max_price)
-
                 st.subheader("Hasil Pencarian dengan Cosine Similarity")
                 for _, row in cosine_results.iterrows():
                     st.write(f"**{row['Nama Parfum']}** oleh {row['Brand atau Produsen']}")
@@ -290,9 +194,6 @@ def main():
                         except FileNotFoundError:
                             st.warning(f"Gambar tidak ditemukan untuk {row['Nama Parfum']}")
                     st.write("---")
-
-                st.subheader("Rekomendasi dari ChatGPT")
-                st.write(chatgpt_results)
             else:
                 st.warning("Tidak ada data parfum yang tersedia untuk pencarian.")
 
@@ -304,56 +205,6 @@ def main():
             st.write("Jawaban:")
             st.write(answer)
 
-    elif choice == "Add New Perfume":
-        st.subheader("Tambah Parfum Baru")
-        nama = st.text_input("Nama Parfum")
-        brand = st.text_input("Brand atau Produsen")
-        jenis = st.text_input("Jenis")
-        kategori = st.text_input("Kategori Aroma")
-        top_notes = st.text_input("Top Notes (pisahkan dengan koma)")
-        middle_notes = st.text_input("Middle Notes (pisahkan dengan koma)")
-        base_notes = st.text_input("Base Notes (pisahkan dengan koma)")
-        kekuatan = st.text_input("Kekuatan Aroma")
-        daya_tahan = st.text_input("Daya Tahan")
-        musim = st.text_input("Musim atau Cuaca")
-        harga = st.text_input("Harga (format: Rp X.XXX.XXX)")
-        ukuran = st.text_input("Ukuran Botol")
-        gender = st.selectbox("Gender", ["Male", "Female", "Unisex"])
-        image = st.file_uploader("Upload Gambar Parfum", type=['png', 'jpg', 'jpeg'])
-
-        if st.button("Tambah Parfum"):
-            if nama and brand:  # Minimal nama dan brand harus diisi
-                if image:
-                    image_path = os.path.join("img", image.name)
-                    with open(image_path, "wb") as f:
-                        f.write(image.getbuffer())
-                else:
-                    image_path = ""
-
-                new_perfume = {
-                    "NamaParfum": nama,
-                    "Brand atau Produsen": brand,
-                    "Jenis": jenis,
-                    "Kategori Aroma": kategori,
-                    "Top Notes": str(top_notes.split(',')),
-                    "Middle Notes": str(middle_notes.split(',')),
-                    "Base Notes": str(base_notes.split(',')),
-                    "Kekuatan Aroma": kekuatan,
-                    "Daya Tahan": daya_tahan,
-                    "Musim atau Cuaca": musim,
-                    "Harga": harga,
-                    "Ukuran Botol": ukuran,
-                    "image_path": image_path,
-                    "Gender": gender
-                }
-
-                if add_new_perfume(new_perfume):
-                    st.success("Parfum baru berhasil ditambahkan!")
-                else:
-                    st.error("Terjadi kesalahan saat menambahkan parfum baru.")
-            else:
-                st.warning("Nama Parfum dan Brand atau Produsen harus diisi.")
-
 if __name__ == "__main__":
     try:
         main()
@@ -362,6 +213,5 @@ if __name__ == "__main__":
         st.error("Aplikasi mengalami error. Silakan cek log untuk detailnya.")
         traceback.print_exc()
     finally:
-        # Pastikan koneksi database ditutup setelah aplikasi selesai
         if 'conn' in globals() and conn:
             conn.close()
