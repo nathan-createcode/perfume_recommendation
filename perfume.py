@@ -16,29 +16,12 @@ from PIL import Image
 logging.basicConfig(level=logging.INFO)
 
 # Fungsi untuk mendapatkan koneksi database
+@st.cache_resource
 def get_db_connection():
     return sqlite3.connect('perfume_recommendation.db', check_same_thread=False)
 
-# Gunakan st.cache_resource untuk menyimpan koneksi database
-@st.cache_resource
-def init_db_connection():
-    return get_db_connection()
-
 # Inisialisasi koneksi database
-conn = init_db_connection()
-
-# Fungsi untuk menutup koneksi database
-def close_db_connection():
-    if 'conn' in globals():
-        conn.close()
-        logging.info("Database connection closed")
-
-# Daftarkan fungsi close_db_connection untuk dijalankan saat aplikasi ditutup
-st.session_state.setdefault('db_connection_closed', False)
-if not st.session_state.db_connection_closed:
-    st.session_state.db_connection_closed = True
-    st.on_session_end(close_db_connection)
-
+conn = get_db_connection()
 
 def clean_price_column(df):
     try:
@@ -362,11 +345,20 @@ def main():
                     if add_new_perfume(new_perfume):
                         st.success("Parfum baru berhasil ditambahkan!")
                         logging.info(f"New perfume added: {new_perfume}")
+
+                        # Tambahkan ini untuk memverifikasi data dalam database
+                        verify_query = "SELECT * FROM perfumes WHERE \"Nama Parfum\" = ?"
+                        cursor = conn.cursor()
+                        cursor.execute(verify_query, (nama,))
+                        result = cursor.fetchone()
+                        if result:
+                            logging.info(f"Verified: Perfume found in database: {result}")
+                        else:
+                            logging.warning(f"Verification failed: Perfume not found in database")
                     else:
                         st.error("Terjadi kesalahan saat menambahkan parfum baru. Silakan cek log untuk detailnya.")
             else:
                 st.error("Nama Parfum dan Brand harus diisi.")
-
 
     elif choice == "AI Model":
         st.subheader("Pemodelan AI untuk Prediksi")
@@ -379,10 +371,6 @@ if __name__ == "__main__":
     except Exception as e:
         logging.error(f"Error in main: {e}")
         st.error("Aplikasi mengalami error. Silakan cek log untuk detailnya.")
-    finally:
-        if 'conn' in globals() and conn:
-            conn.close()
-            logging.info("Database connection closed")
 
 print("Aplikasi Rekomendasi Parfum berhasil dijalankan!")
 
