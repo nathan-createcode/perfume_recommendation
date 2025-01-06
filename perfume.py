@@ -13,7 +13,7 @@ import os
 from PIL import Image
 
 # Konfigurasi logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Fungsi untuk mendapatkan koneksi database
 @st.cache_resource
@@ -152,6 +152,8 @@ def add_new_perfume(data):
     """
     try:
         logging.info(f"Attempting to add new perfume: {data}")
+        logging.debug(f"Query: {query}")
+        logging.debug(f"Data: {tuple(data.values())}")
         with conn:  # This ensures that changes are committed
             conn.execute(query, tuple(data.values()))
         logging.info("New perfume added successfully")
@@ -222,6 +224,13 @@ def normalize_image_path(path):
     if normalized.startswith('perfume_recommendation/'):
         normalized = normalized[len('perfume_recommendation/'):]
     return normalized
+
+def optimize_database():
+    try:
+        conn.execute("VACUUM")
+        logging.info("Database optimized successfully")
+    except sqlite3.Error as e:
+        logging.error(f"Error optimizing database: {e}")
 
 # Fungsi utama aplikasi
 def main():
@@ -301,7 +310,7 @@ def main():
         jenis = st.selectbox("Jenis Parfum", ["EDP", "EDT", "EDC", "Perfume", "Extrait de Parfum", "Parfum Cologne"], key="jenis_parfum")
         kategori = st.text_input("Kategori Aroma")
         top_notes = st.text_area("Top Notes (pisahkan dengan koma)")
-        middle_notes = st.text_area("Middle Notes (pisahkan dengan koma)")
+        middle_notes = st.text_area("Middle Notes (koma)")
         base_notes = st.text_area("Base Notes (pisahkan dengan koma)")
         kekuatan = st.selectbox("Kekuatan Aroma", ["Ringan", "Sedang", "Kuat", "Sangat Kuat"], key="kekuatan_aroma")
         daya_tahan = st.selectbox("Daya Tahan", ["Pendek", "Sedang", "Lama", "Sangat Lama"], key="daya_tahan")
@@ -346,7 +355,7 @@ def main():
                         st.success("Parfum baru berhasil ditambahkan!")
                         logging.info(f"New perfume added: {new_perfume}")
 
-                        # Tambahkan ini untuk memverifikasi data dalam database
+                        # Verifikasi data dalam database
                         verify_query = "SELECT * FROM perfumes WHERE \"Nama Parfum\" = ?"
                         cursor = conn.cursor()
                         cursor.execute(verify_query, (nama,))
@@ -367,10 +376,12 @@ def main():
 
 if __name__ == "__main__":
     try:
+        optimize_database()
         main()
     except Exception as e:
         logging.error(f"Error in main: {e}")
         st.error("Aplikasi mengalami error. Silakan cek log untuk detailnya.")
+    finally:
+        conn.close()
 
 print("Aplikasi Rekomendasi Parfum berhasil dijalankan!")
-
