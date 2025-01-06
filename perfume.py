@@ -123,6 +123,7 @@ def visualize_data(df):
     plt.tight_layout()
     st.pyplot(fig)
 
+    st.subheader("Edukasi tentang Parfum")
     st.write("""
         🌸 **Kategori Aroma Parfum**
 
