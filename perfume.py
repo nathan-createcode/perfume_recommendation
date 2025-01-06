@@ -214,7 +214,7 @@ def main():
     st.title("Aplikasi Rekomendasi Parfum")
 
     menu = ["Home", "Search Perfume", "Add New Perfume", "AI Model"]
-    choice = st.sidebar.selectbox("Menu", menu)
+    choice = st.sidebar.selectbox("Menu", menu, key="main_menu")
 
     df = get_perfume_data()
     if not df.empty:
@@ -229,13 +229,13 @@ def main():
 
         col1, col2 = st.columns(2)
         with col1:
-            gender = st.selectbox("Gender", ["", "Female", "Male", "Unisex"])
-            jenis = st.selectbox("Jenis", ["", "EDP", "EDT", "EDC", "Perfume", "Extrait de Parfum", "Parfum Cologne"])
-            kekuatan_aroma = st.selectbox("Kekuatan Aroma", ["", "Ringan", "Sedang", "Kuat", "Sangat Kuat"])
+            gender = st.selectbox("Gender", ["", "Female", "Male", "Unisex"], key="gender_filter")
+            jenis = st.selectbox("Jenis", ["", "EDP", "EDT", "EDC", "Perfume", "Extrait de Parfum", "Parfum Cologne"], key="jenis_filter")
+            kekuatan_aroma = st.selectbox("Kekuatan Aroma", ["", "Ringan", "Sedang", "Kuat", "Sangat Kuat"], key="kekuatan_aroma_filter")
 
         with col2:
-            daya_tahan = st.selectbox("Daya Tahan", ["", "Pendek", "Sedang", "Lama", "Sangat Lama"])
-            musim = st.selectbox("Musim atau Cuaca", ["", "Semua Musim", "Musim Panas", "Musim Dingin", "Musim Semi", "Musim Gugur", "Malam Hari"])
+            daya_tahan = st.selectbox("Daya Tahan", ["", "Pendek", "Sedang", "Lama", "Sangat Lama"], key="daya_tahan_filter")
+            musim = st.selectbox("Musim atau Cuaca", ["", "Semua Musim", "Musim Panas", "Musim Dingin", "Musim Semi", "Musim Gugur", "Malam Hari"], key="musim_filter")
             harga = st.text_input("Batas Harga (contoh: Rp7.000.000)", "")
 
         filters = {
@@ -279,14 +279,14 @@ def main():
         st.subheader("Tambah Parfum Baru")
         nama = st.text_input("Nama Parfum")
         brand = st.text_input("Brand atau Produsen")
-        jenis = st.selectbox("Jenis Parfum", ["EDP", "EDT", "EDC", "Perfume", "Extrait de Parfum", "Parfum Cologne"])
+        jenis = st.selectbox("Jenis Parfum", ["EDP", "EDT", "EDC", "Perfume", "Extrait de Parfum", "Parfum Cologne"], key="jenis_parfum")
         kategori = st.text_input("Kategori Aroma")
         top_notes = st.text_area("Top Notes (pisahkan dengan koma)")
         middle_notes = st.text_area("Middle Notes (pisahkan dengan koma)")
         base_notes = st.text_area("Base Notes (pisahkan dengan koma)")
-        kekuatan = st.selectbox("Kekuatan Aroma", ["Ringan", "Sedang", "Kuat", "Sangat Kuat"])
-        daya_tahan = st.selectbox("Daya Tahan", ["Pendek", "Sedang", "Lama", "Sangat Lama"])
-        musim = st.selectbox("Musim atau Cuaca", ["Semua Musim", "Musim Panas", "Musim Dingin", "Musim Semi", "Musim Gugur", "Malam Hari"])
+        kekuatan = st.selectbox("Kekuatan Aroma", ["Ringan", "Sedang", "Kuat", "Sangat Kuat"], key="kekuatan_aroma")
+        daya_tahan = st.selectbox("Daya Tahan", ["Pendek", "Sedang", "Lama", "Sangat Lama"], key="daya_tahan")
+        musim = st.selectbox("Musim atau Cuaca", ["Semua Musim", "Musim Panas", "Musim Dingin", "Musim Semi", "Musim Gugur", "Malam Hari"], key="musim")
         harga = st.text_input("Harga (format: Rp X.XXX.XXX)")
         ukuran = st.text_input("Ukuran Botol")
         gender = st.selectbox("Gender", ["Female", "Male", "Unisex"])
