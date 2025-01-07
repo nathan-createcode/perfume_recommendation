@@ -170,14 +170,10 @@ def extract_perfume_info(perfume):
         'nama': perfume['Nama Parfum'],
         'brand': perfume['Brand atau Produsen'],
         'kategori': perfume['Kategori Aroma'],
-        'top_notes': ast.literal_eval(perfume['Top Notes']),
-        'middle_notes': ast.literal_eval(perfume['Middle Notes']),
-        'base_notes': ast.literal_eval(perfume['Base Notes']),
-        'gender': perfume['Gender'],
-        'kekuatan': perfume['Kekuatan Aroma'],
-        'daya_tahan': perfume['Daya Tahan'],
-        'musim': perfume['Musim atau Cuaca'],
-        'harga': perfume['Harga']
+        'top_notes': perfume['Top Notes'],
+        'middle_notes': perfume['Middle Notes'],
+        'base_notes': perfume['Base Notes'],
+        'gender': perfume['Gender']
     }
     return info
 
