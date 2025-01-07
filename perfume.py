@@ -28,10 +28,8 @@ logging.basicConfig(
 )
 
 # Download NLTK data
-nltk.download('punkt')
-nltk.download('stopwords')
-nltk.download('punkt')
-nltk.download('stopwords')
+nltk.download('punkt', quiet=True)
+nltk.download('stopwords', quiet=True)
 
 # Fungsi untuk mendapatkan koneksi database
 def get_db_connection():
@@ -80,7 +78,7 @@ def get_perfume_data():
         query = "SELECT * FROM perfumes"
         df = pd.read_sql_query(query, conn)
         required_columns = ['Nama Parfum', 'Brand atau Produsen', 'Kategori Aroma', 'Top Notes',
-                          'Middle Notes', 'Base Notes', 'Gender', 'Harga']
+                          'Middle Notes', 'Base Notes', 'Gender', 'Harga', 'Kekuatan Aroma', 'Daya Tahan', 'Musim atau Cuaca']
         missing_columns = [col for col in required_columns if col not in df.columns]
         if missing_columns:
             st.error(f"Kolom yang diperlukan tidak ditemukan dalam database: {', '.join(missing_columns)}")
@@ -173,7 +171,11 @@ def extract_perfume_info(perfume):
         'top_notes': perfume['Top Notes'],
         'middle_notes': perfume['Middle Notes'],
         'base_notes': perfume['Base Notes'],
-        'gender': perfume['Gender']
+        'gender': perfume['Gender'],
+        'kekuatan': perfume['Kekuatan Aroma'],
+        'daya_tahan': perfume['Daya Tahan'],
+        'musim': perfume['Musim atau Cuaca'],
+        'harga': perfume['Harga']
     }
     return info
 
@@ -189,11 +191,17 @@ def generate_perfume_description(perfume_info, level='pemula'):
         description.update({
             'top_notes': f"Top Notes: {', '.join(perfume_info['top_notes'])}",
             'middle_notes': f"Middle Notes: {', '.join(perfume_info['middle_notes'])}",
-            'base_notes': f"Base Notes: {', '.join(perfume_info['base_notes'])}"
+            'base_notes': f"Base Notes: {', '.join(perfume_info['base_notes'])}",
+            'kekuatan': f"Kekuatan Aroma: {perfume_info['kekuatan']}",
+            'daya_tahan': f"Daya Tahan: {perfume_info['daya_tahan']}",
+            'musim': f"Musim yang Cocok: {perfume_info['musim']}",
+            'harga': f"Harga: {perfume_info['harga']}"
         })
     else:  # pemula
         description.update({
-            'aroma_utama': f"Aroma Utama: {perfume_info['top_notes'][0] if perfume_info['top_notes'] else 'tidak diketahui'}"
+            'aroma_utama': f"Aroma Utama: {perfume_info['top_notes'][0] if perfume_info['top_notes'] else 'tidak diketahui'}",
+            'kekuatan': f"Kekuatan Aroma: {perfume_info['kekuatan']}",
+            'musim': f"Musim yang Cocok: {perfume_info['musim']}"
         })
 
     return description
@@ -319,7 +327,6 @@ def check_database_status():
         logging.info(f"Database integrity check result: {integrity_result}")
 
         return {
-            'total_count': total_count,
             'total_count': total_count,
             'last_perfume': last_perfume,
             'integrity': integrity_result
@@ -454,19 +461,20 @@ def main():
         if st.button("Pelajari Parfum"):
             perfume = df[df['Nama Parfum'] == perfume_name].iloc[0]
             perfume_info = extract_perfume_info(perfume)
+            description = generate_perfume_description(perfume_info, level.lower())
 
             st.write("### Informasi Parfum")
-            st.write(f"**Nama Parfum:** {perfume_info['nama']}")
-            st.write(f"**Brand:** {perfume_info['brand']}")
-            st.write(f"**Kategori:** {perfume_info['kategori']}")
-            st.write(f"**Gender:** {perfume_info['gender']}")
+            for key, value in description.items():
+                st.write(f"**{value}**")
 
             if level.lower() == 'expert':
-                st.write(f"**Top Notes:** {', '.join(perfume_info['top_notes'])}")
-                st.write(f"**Middle Notes:** {', '.join(perfume_info['middle_notes'])}")
-                st.write(f"**Base Notes:** {', '.join(perfume_info['base_notes'])}")
+                st.write("\n### Penjelasan Detail")
+                st.write("Top Notes: Aroma yang pertama kali tercium saat parfum diaplikasikan.")
+                st.write("Middle Notes: Aroma yang muncul setelah top notes menghilang.")
+                st.write("Base Notes: Aroma dasar yang bertahan paling lama.")
             else:
-                st.write(f"**Aroma Utama:** {perfume_info['top_notes'][0] if perfume_info['top_notes'] else 'tidak diketahui'}")
+                st.write("\n### Penjelasan Singkat")
+                st.write("Aroma Utama: Aroma yang paling dominan dan pertama kali tercium.")
 
             st.write("\n### Panduan Penggunaan")
             st.write("1. Aplikasikan parfum pada titik nadi (pergelangan tangan, leher, belakang telinga)")
@@ -626,4 +634,3 @@ if __name__ == "__main__":
         st.error("Aplikasi mengalami error. Silakan cek log untuk detailnya.")
 
 print("Aplikasi Rekomendasi Parfum berhasil dijalankan!")
-
