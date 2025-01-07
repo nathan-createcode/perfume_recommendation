@@ -14,6 +14,8 @@ import os
 from PIL import Image
 from sqlite3 import Error
 import ast
+from sklearn.preprocessing import MinMaxScaler
+import numpy as np
 
 # Konfigurasi logging
 logging.basicConfig(
@@ -29,7 +31,7 @@ logging.basicConfig(
 nltk.download('punkt')
 nltk.download('stopwords')
 
-# Fungsi untuk mendapatkan koneksi database dengan pengaturan yang diperbarui
+# Fungsi untuk mendapatkan koneksi database
 def get_db_connection():
     try:
         conn = sqlite3.connect('perfume_recommendation.db', check_same_thread=False)
@@ -134,20 +136,28 @@ def visualize_data(df):
 
 # Fungsi untuk sistem rekomendasi berbasis konten
 def create_feature_matrix(df):
+    # Fitur yang akan digunakan untuk rekomendasi
     features = ['Kategori Aroma', 'Top Notes', 'Middle Notes', 'Base Notes', 'Gender']
-    for feature in features:
-        df[feature] = df[feature].fillna('')
 
+    # Menggabungkan semua fitur menjadi satu string
     df['combined_features'] = df.apply(lambda row: ' '.join(str(row[feature]) for feature in features), axis=1)
 
+    # Menggunakan TF-IDF untuk fitur teks
     tfidf = TfidfVectorizer(stop_words='english')
     tfidf_matrix = tfidf.fit_transform(df['combined_features'])
 
-    return tfidf_matrix
+    # Menormalisasi harga
+    scaler = MinMaxScaler()
+    df['normalized_price'] = scaler.fit_transform(df[['Harga']])
 
-def get_recommendations(perfume_name, df, tfidf_matrix):
+    # Menggabungkan matriks TF-IDF dengan harga yang dinormalisasi
+    feature_matrix = np.hstack((tfidf_matrix.toarray(), df['normalized_price'].values.reshape(-1, 1)))
+
+    return feature_matrix
+
+def get_recommendations(perfume_name, df, feature_matrix):
     idx = df.index[df['Nama Parfum'] == perfume_name].tolist()[0]
-    cosine_sim = cosine_similarity(tfidf_matrix[idx:idx+1], tfidf_matrix).flatten()
+    cosine_sim = cosine_similarity(feature_matrix[idx:idx+1], feature_matrix).flatten()
     sim_scores = list(enumerate(cosine_sim))
     sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
     sim_scores = sim_scores[1:11]  # Top 10 similar perfumes
@@ -439,8 +449,8 @@ def main():
         perfume_name = st.selectbox("Pilih parfum yang Anda sukai:", df['Nama Parfum'].tolist())
 
         if st.button("Dapatkan Rekomendasi"):
-            tfidf_matrix = create_feature_matrix(df)
-            recommendations = get_recommendations(perfume_name, df, tfidf_matrix)
+            feature_matrix = create_feature_matrix(df)
+            recommendations = get_recommendations(perfume_name, df, feature_matrix)
 
             st.write("Rekomendasi parfum untuk Anda:")
             for idx, row in recommendations.iterrows():
@@ -503,7 +513,7 @@ def main():
                             if os.path.exists(full_path):
                                 try:
                                     image = Image.open(full_path)
-                                    st.image(image, caption=row['Nama Parfum'], use_container_width=True)
+                                    st.image(image, caption=row['Nama Parfum'], use_column_width=True)
                                 except Exception as e:
                                     st.error(f"Terjadi kesalahan saat menampilkan gambar: {e}")
                             else:
