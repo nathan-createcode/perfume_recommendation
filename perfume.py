@@ -193,17 +193,11 @@ def generate_perfume_description(perfume_info, level='pemula'):
         description.update({
             'top_notes': f"Top Notes: {', '.join(perfume_info['top_notes'])}",
             'middle_notes': f"Middle Notes: {', '.join(perfume_info['middle_notes'])}",
-            'base_notes': f"Base Notes: {', '.join(perfume_info['base_notes'])}",
-            'kekuatan': f"Kekuatan Aroma: {perfume_info['kekuatan']}",
-            'daya_tahan': f"Daya Tahan: {perfume_info['daya_tahan']}",
-            'musim': f"Musim yang Cocok: {perfume_info['musim']}",
-            'harga': f"Harga: {perfume_info['harga']}"
+            'base_notes': f"Base Notes: {', '.join(perfume_info['base_notes'])}"
         })
     else:  # pemula
         description.update({
-            'aroma_utama': f"Aroma Utama: {perfume_info['top_notes'][0] if perfume_info['top_notes'] else 'tidak diketahui'}",
-            'kekuatan': f"Kekuatan Aroma: {perfume_info['kekuatan']}",
-            'musim': f"Musim yang Cocok: {perfume_info['musim']}"
+            'aroma_utama': f"Aroma Utama: {perfume_info['top_notes'][0] if perfume_info['top_notes'] else 'tidak diketahui'}"
         })
 
     return description
