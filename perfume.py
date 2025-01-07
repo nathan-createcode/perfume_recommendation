@@ -5,15 +5,15 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+import nltk
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+import string
 import logging
 import os
 from PIL import Image
 from sqlite3 import Error
 import ast
-import string
-import nltk
-from nltk.tokenize import word_tokenize
-from nltk.corpus import stopwords
 
 # Konfigurasi logging
 logging.basicConfig(
@@ -26,17 +26,22 @@ logging.basicConfig(
 )
 
 # Download NLTK data
-nltk.download('punkt', quiet=True)
-nltk.download('stopwords', quiet=True)
+nltk.download('punkt')
+nltk.download('stopwords')
 
-# Fungsi untuk mendapatkan koneksi database
+# Fungsi untuk mendapatkan koneksi database dengan pengaturan yang diperbarui
 def get_db_connection():
     try:
         conn = sqlite3.connect('perfume_recommendation.db', check_same_thread=False)
         conn.row_factory = sqlite3.Row
+
+        # Nonaktifkan write-ahead logging
         conn.execute("PRAGMA journal_mode=DELETE")
+        # Aktifkan synchronous mode
         conn.execute("PRAGMA synchronous=FULL")
+        # Aktifkan foreign key constraints
         conn.execute("PRAGMA foreign_keys=ON")
+
         logging.info("Database connection established successfully")
         return conn
     except Error as e:
@@ -197,9 +202,12 @@ def answer_perfume_question(question, perfume_info):
 def normalize_price(price_str):
     if not price_str:
         return None
+    # Remove 'Rp', dots, spaces, and commas
     price_str = price_str.replace('Rp', '').replace('.', '').replace(' ', '').replace(',', '')
     try:
+        # Convert to integer
         price = int(price_str)
+        # Format back to standard format
         return f"Rp{price:,}".replace(',', '.')
     except ValueError:
         return None
@@ -227,13 +235,19 @@ def add_new_perfume(data):
 
         logging.info(f"Memulai transaksi untuk menambah parfum baru: {data['Nama Parfum']}")
 
+        # Mulai transaksi dengan IMMEDIATE untuk mengunci database
         conn.execute("BEGIN IMMEDIATE TRANSACTION")
+
+        # Eksekusi query insert
         cursor.execute(query, tuple(data.values()))
+
+        # Verifikasi penambahan
         cursor.execute("SELECT COUNT(*) FROM perfumes")
         count_after = cursor.fetchone()[0]
         logging.info(f"Jumlah parfum setelah penambahan: {count_after}")
 
         if count_after > count_before:
+            # Verifikasi data yang baru ditambahkan
             cursor.execute(
                 'SELECT * FROM perfumes WHERE "Nama Parfum" = ? AND "Brand atau Produsen" = ?',
                 (data['Nama Parfum'], data['Brand atau Produsen'])
@@ -243,8 +257,11 @@ def add_new_perfume(data):
             if new_perfume:
                 logging.info(f"Data parfum baru berhasil diverifikasi: {new_perfume}")
                 conn.commit()
+
+                # Paksa flush ke disk
                 conn.execute("PRAGMA wal_checkpoint")
                 conn.execute("VACUUM")
+
                 logging.info("Transaksi berhasil di-commit dan di-flush ke disk")
                 return True
             else:
@@ -280,10 +297,13 @@ def check_database_status():
 
     try:
         cursor = conn.cursor()
+
+        # Periksa jumlah total parfum
         cursor.execute("SELECT COUNT(*) FROM perfumes")
         total_count = cursor.fetchone()[0]
         logging.info(f"Total parfum dalam database: {total_count}")
 
+        # Periksa parfum terakhir yang ditambahkan
         cursor.execute("""
             SELECT "Nama Parfum", "Brand atau Produsen"
             FROM perfumes
@@ -294,6 +314,7 @@ def check_database_status():
         if last_perfume:
             logging.info(f"Parfum terakhir dalam database: {last_perfume}")
 
+        # Periksa integritas database
         cursor.execute("PRAGMA integrity_check")
         integrity_result = cursor.fetchone()[0]
         logging.info(f"Database integrity check result: {integrity_result}")
@@ -309,12 +330,14 @@ def check_database_status():
     finally:
         close_db_connection(conn)
 
+# Tambahan fungsi untuk memastikan database tersimpan
 def ensure_database_saved():
     conn = get_db_connection()
     if not conn:
         return False
 
     try:
+        # Paksa semua perubahan tersimpan ke disk
         conn.execute("PRAGMA wal_checkpoint")
         conn.execute("VACUUM")
         conn.commit()
@@ -376,7 +399,9 @@ def search_perfume(query, filters):
 def normalize_image_path(path):
     if not path:
         return ""
+    # Ubah backslash menjadi forward slash
     normalized = path.replace('\\', '/')
+    # Hapus awalan 'perfume_recommendation/' jika ada
     if normalized.startswith('perfume_recommendation/'):
         normalized = normalized[len('perfume_recommendation/'):]
     return normalized
@@ -496,6 +521,7 @@ def main():
     elif choice == "Add New Perfume":
         st.subheader("Tambah Parfum Baru")
 
+        # Tampilkan status database sebelum penambahan
         st.write("Status Database Sebelum Penambahan:")
         initial_status = check_database_status()
         if initial_status:
@@ -521,6 +547,7 @@ def main():
         if st.button("Tambah Parfum"):
             if nama and brand:
                 if image:
+                    # Save the image in the 'img' folder
                     os.makedirs("img", exist_ok=True)
                     image_path = os.path.join("img", image.name)
                     with open(image_path, "wb") as f:
@@ -555,6 +582,7 @@ def main():
                         else:
                             st.warning("Parfum berhasil ditambahkan tetapi mungkin belum tersimpan permanen. Silakan cek database.")
 
+                        # Tampilkan status database setelah penambahan
                         st.write("Status Database Setelah Penambahan:")
                         final_status = check_database_status()
                         if final_status:
