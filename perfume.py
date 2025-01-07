@@ -170,10 +170,14 @@ def extract_perfume_info(perfume):
         'nama': perfume['Nama Parfum'],
         'brand': perfume['Brand atau Produsen'],
         'kategori': perfume['Kategori Aroma'],
-        'top_notes': perfume['Top Notes'],
-        'middle_notes': perfume['Middle Notes'],
-        'base_notes': perfume['Base Notes'],
-        'gender': perfume['Gender']
+        'top_notes': ast.literal_eval(perfume['Top Notes']),
+        'middle_notes': ast.literal_eval(perfume['Middle Notes']),
+        'base_notes': ast.literal_eval(perfume['Base Notes']),
+        'gender': perfume['Gender'],
+        'kekuatan': perfume['Kekuatan Aroma'],
+        'daya_tahan': perfume['Daya Tahan'],
+        'musim': perfume['Musim atau Cuaca'],
+        'harga': perfume['Harga']
     }
     return info
 
@@ -189,11 +193,17 @@ def generate_perfume_description(perfume_info, level='pemula'):
         description.update({
             'top_notes': f"Top Notes: {', '.join(perfume_info['top_notes'])}",
             'middle_notes': f"Middle Notes: {', '.join(perfume_info['middle_notes'])}",
-            'base_notes': f"Base Notes: {', '.join(perfume_info['base_notes'])}"
+            'base_notes': f"Base Notes: {', '.join(perfume_info['base_notes'])}",
+            'kekuatan': f"Kekuatan Aroma: {perfume_info['kekuatan']}",
+            'daya_tahan': f"Daya Tahan: {perfume_info['daya_tahan']}",
+            'musim': f"Musim yang Cocok: {perfume_info['musim']}",
+            'harga': f"Harga: {perfume_info['harga']}"
         })
     else:  # pemula
         description.update({
-            'aroma_utama': f"Aroma Utama: {perfume_info['top_notes'][0] if perfume_info['top_notes'] else 'tidak diketahui'}"
+            'aroma_utama': f"Aroma Utama: {perfume_info['top_notes'][0] if perfume_info['top_notes'] else 'tidak diketahui'}",
+            'kekuatan': f"Kekuatan Aroma: {perfume_info['kekuatan']}",
+            'musim': f"Musim yang Cocok: {perfume_info['musim']}"
         })
 
     return description
@@ -454,19 +464,20 @@ def main():
         if st.button("Pelajari Parfum"):
             perfume = df[df['Nama Parfum'] == perfume_name].iloc[0]
             perfume_info = extract_perfume_info(perfume)
+            description = generate_perfume_description(perfume_info, level.lower())
 
             st.write("### Informasi Parfum")
-            st.write(f"**Nama Parfum:** {perfume_info['nama']}")
-            st.write(f"**Brand:** {perfume_info['brand']}")
-            st.write(f"**Kategori:** {perfume_info['kategori']}")
-            st.write(f"**Gender:** {perfume_info['gender']}")
+            for key, value in description.items():
+                st.write(f"**{value}**")
 
             if level.lower() == 'expert':
-                st.write(f"**Top Notes:** {', '.join(perfume_info['top_notes'])}")
-                st.write(f"**Middle Notes:** {', '.join(perfume_info['middle_notes'])}")
-                st.write(f"**Base Notes:** {', '.join(perfume_info['base_notes'])}")
+                st.write("\n### Penjelasan Detail")
+                st.write("Top Notes: Aroma yang pertama kali tercium saat parfum diaplikasikan.")
+                st.write("Middle Notes: Aroma yang muncul setelah top notes menghilang.")
+                st.write("Base Notes: Aroma dasar yang bertahan paling lama.")
             else:
-                st.write(f"**Aroma Utama:** {perfume_info['top_notes'][0] if perfume_info['top_notes'] else 'tidak diketahui'}")
+                st.write("\n### Penjelasan Singkat")
+                st.write("Aroma Utama: Aroma yang paling dominan dan pertama kali tercium.")
 
             st.write("\n### Panduan Penggunaan")
             st.write("1. Aplikasikan parfum pada titik nadi (pergelangan tangan, leher, belakang telinga)")
