@@ -3,15 +3,17 @@ import pandas as pd
 import sqlite3
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
-from sklearn.metrics import mean_squared_error, classification_report
-from sklearn.preprocessing import LabelEncoder
-import ast
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 import logging
 import os
 from PIL import Image
 from sqlite3 import Error
+import ast
+import string
+import nltk
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
 
 # Konfigurasi logging
 logging.basicConfig(
@@ -23,19 +25,18 @@ logging.basicConfig(
     ]
 )
 
-# Fungsi untuk mendapatkan koneksi database dengan pengaturan yang diperbarui
+# Download NLTK data
+nltk.download('punkt', quiet=True)
+nltk.download('stopwords', quiet=True)
+
+# Fungsi untuk mendapatkan koneksi database
 def get_db_connection():
     try:
         conn = sqlite3.connect('perfume_recommendation.db', check_same_thread=False)
         conn.row_factory = sqlite3.Row
-
-        # Nonaktifkan write-ahead logging
         conn.execute("PRAGMA journal_mode=DELETE")
-        # Aktifkan synchronous mode
         conn.execute("PRAGMA synchronous=FULL")
-        # Aktifkan foreign key constraints
         conn.execute("PRAGMA foreign_keys=ON")
-
         logging.info("Database connection established successfully")
         return conn
     except Error as e:
@@ -126,65 +127,79 @@ def visualize_data(df):
     plt.tight_layout()
     st.pyplot(fig)
 
-# Fungsi untuk memodelkan AI
-def ai_model(df, model_type="regression"):
-    # Preprocessing untuk model
-    df = clean_price_column(df)
-    df = df.dropna(subset=['Harga'])
+# Fungsi untuk sistem rekomendasi berbasis konten
+def create_feature_matrix(df):
+    features = ['Kategori Aroma', 'Top Notes', 'Middle Notes', 'Base Notes', 'Gender']
+    for feature in features:
+        df[feature] = df[feature].fillna('')
 
-    # Encoding untuk variabel kategorikal
-    le = LabelEncoder()
-    df['Gender'] = le.fit_transform(df['Gender'].astype(str))
-    df['Kategori Aroma'] = le.fit_transform(df['Kategori Aroma'].astype(str))
+    df['combined_features'] = df.apply(lambda row: ' '.join(str(row[feature]) for feature in features), axis=1)
 
-    # Pilih fitur dan target
-    X = df[['Gender', 'Kategori Aroma']]
-    y = df['Harga']
+    tfidf = TfidfVectorizer(stop_words='english')
+    tfidf_matrix = tfidf.fit_transform(df['combined_features'])
 
-    # Split data
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    return tfidf_matrix
 
-    # Pilih model berdasarkan tipe
-    if model_type == "regression":
-        model = RandomForestRegressor(n_estimators=100, random_state=42)
+def get_recommendations(perfume_name, df, tfidf_matrix):
+    idx = df.index[df['Nama Parfum'] == perfume_name].tolist()[0]
+    cosine_sim = cosine_similarity(tfidf_matrix[idx:idx+1], tfidf_matrix).flatten()
+    sim_scores = list(enumerate(cosine_sim))
+    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+    sim_scores = sim_scores[1:11]  # Top 10 similar perfumes
+    perfume_indices = [i[0] for i in sim_scores]
+    return df.iloc[perfume_indices]
+
+# Fungsi untuk NLP dan edukasi parfum
+def preprocess_text(text):
+    tokens = word_tokenize(text.lower())
+    stop_words = set(stopwords.words('indonesian'))
+    tokens = [word for word in tokens if word not in string.punctuation and word not in stop_words]
+    return tokens
+
+def extract_perfume_info(perfume):
+    info = {
+        'nama': perfume['Nama Parfum'],
+        'brand': perfume['Brand atau Produsen'],
+        'kategori': perfume['Kategori Aroma'],
+        'top_notes': perfume['Top Notes'],
+        'middle_notes': perfume['Middle Notes'],
+        'base_notes': perfume['Base Notes'],
+        'gender': perfume['Gender']
+    }
+    return info
+
+def generate_perfume_description(perfume_info, level='pemula'):
+    if level == 'pemula':
+        description = f"{perfume_info['nama']} adalah parfum {perfume_info['kategori']} dari {perfume_info['brand']}. "
+        description += f"Parfum ini cocok untuk {perfume_info['gender']}. "
+        description += f"Aroma utamanya adalah {perfume_info['top_notes'][0] if perfume_info['top_notes'] else 'tidak diketahui'}."
+    else:  # expert
+        description = f"{perfume_info['nama']} adalah kreasi {perfume_info['brand']} dalam kategori {perfume_info['kategori']}. "
+        description += f"Didesain untuk {perfume_info['gender']}, parfum ini memiliki profil aroma yang kompleks. "
+        description += f"Top notes: {', '.join(perfume_info['top_notes'])}. "
+        description += f"Middle notes: {', '.join(perfume_info['middle_notes'])}. "
+        description += f"Base notes: {', '.join(perfume_info['base_notes'])}."
+
+    return description
+
+def answer_perfume_question(question, perfume_info):
+    tokens = preprocess_text(question)
+
+    if 'apa' in tokens and 'top' in tokens and 'notes' in tokens:
+        return f"Top notes dari {perfume_info['nama']} adalah {', '.join(perfume_info['top_notes'])}."
+    elif 'siapa' in tokens and 'pembuat' in tokens:
+        return f"{perfume_info['nama']} dibuat oleh {perfume_info['brand']}."
+    elif 'kategori' in tokens:
+        return f"{perfume_info['nama']} termasuk dalam kategori {perfume_info['kategori']}."
     else:
-        model = RandomForestClassifier(n_estimators=100, random_state=42)
-
-    # Latih model
-    model.fit(X_train, y_train)
-
-    # Prediksi dan evaluasi
-    y_pred = model.predict(X_test)
-
-    # Metrik evaluasi
-    if model_type == "regression":
-        mse = mean_squared_error(y_test, y_pred)
-        st.write(f"Mean Squared Error: {mse:.2f}")
-    else:
-        report = classification_report(y_test, y_pred)
-        st.text(report)
-
-    # Prediksi untuk data baru
-    st.subheader("Prediksi Harga Parfum")
-    st.write("Masukkan data untuk prediksi:")
-    gender_input = st.selectbox("Gender", ["Female", "Male", "Unisex"])
-    kategori_input = st.selectbox("Kategori Aroma", df['Kategori Aroma'].unique())
-
-    if st.button("Prediksi"):
-        gender_encoded = le.transform([gender_input])[0]
-        kategori_encoded = le.transform([kategori_input])[0]
-        prediction = model.predict([[gender_encoded, kategori_encoded]])
-        st.write(f"Prediksi Harga: Rp {prediction[0]:,.0f}")
+        return "Maaf, saya tidak dapat menjawab pertanyaan tersebut. Coba tanyakan tentang top notes, pembuat, atau kategori parfum."
 
 def normalize_price(price_str):
     if not price_str:
         return None
-    # Remove 'Rp', dots, spaces, and commas
     price_str = price_str.replace('Rp', '').replace('.', '').replace(' ', '').replace(',', '')
     try:
-        # Convert to integer
         price = int(price_str)
-        # Format back to standard format
         return f"Rp{price:,}".replace(',', '.')
     except ValueError:
         return None
@@ -212,19 +227,13 @@ def add_new_perfume(data):
 
         logging.info(f"Memulai transaksi untuk menambah parfum baru: {data['Nama Parfum']}")
 
-        # Mulai transaksi dengan IMMEDIATE untuk mengunci database
         conn.execute("BEGIN IMMEDIATE TRANSACTION")
-
-        # Eksekusi query insert
         cursor.execute(query, tuple(data.values()))
-
-        # Verifikasi penambahan
         cursor.execute("SELECT COUNT(*) FROM perfumes")
         count_after = cursor.fetchone()[0]
         logging.info(f"Jumlah parfum setelah penambahan: {count_after}")
 
         if count_after > count_before:
-            # Verifikasi data yang baru ditambahkan
             cursor.execute(
                 'SELECT * FROM perfumes WHERE "Nama Parfum" = ? AND "Brand atau Produsen" = ?',
                 (data['Nama Parfum'], data['Brand atau Produsen'])
@@ -234,11 +243,8 @@ def add_new_perfume(data):
             if new_perfume:
                 logging.info(f"Data parfum baru berhasil diverifikasi: {new_perfume}")
                 conn.commit()
-
-                # Paksa flush ke disk
                 conn.execute("PRAGMA wal_checkpoint")
                 conn.execute("VACUUM")
-
                 logging.info("Transaksi berhasil di-commit dan di-flush ke disk")
                 return True
             else:
@@ -274,13 +280,10 @@ def check_database_status():
 
     try:
         cursor = conn.cursor()
-
-        # Periksa jumlah total parfum
         cursor.execute("SELECT COUNT(*) FROM perfumes")
         total_count = cursor.fetchone()[0]
         logging.info(f"Total parfum dalam database: {total_count}")
 
-        # Periksa parfum terakhir yang ditambahkan
         cursor.execute("""
             SELECT "Nama Parfum", "Brand atau Produsen"
             FROM perfumes
@@ -291,7 +294,6 @@ def check_database_status():
         if last_perfume:
             logging.info(f"Parfum terakhir dalam database: {last_perfume}")
 
-        # Periksa integritas database
         cursor.execute("PRAGMA integrity_check")
         integrity_result = cursor.fetchone()[0]
         logging.info(f"Database integrity check result: {integrity_result}")
@@ -307,14 +309,12 @@ def check_database_status():
     finally:
         close_db_connection(conn)
 
-# Tambahan fungsi untuk memastikan database tersimpan
 def ensure_database_saved():
     conn = get_db_connection()
     if not conn:
         return False
 
     try:
-        # Paksa semua perubahan tersimpan ke disk
         conn.execute("PRAGMA wal_checkpoint")
         conn.execute("VACUUM")
         conn.commit()
@@ -376,9 +376,7 @@ def search_perfume(query, filters):
 def normalize_image_path(path):
     if not path:
         return ""
-    # Ubah backslash menjadi forward slash
     normalized = path.replace('\\', '/')
-    # Hapus awalan 'perfume_recommendation/' jika ada
     if normalized.startswith('perfume_recommendation/'):
         normalized = normalized[len('perfume_recommendation/'):]
     return normalized
@@ -398,9 +396,9 @@ def optimize_database():
         close_db_connection(conn)
 
 def main():
-    st.title("Aplikasi Rekomendasi Parfum")
+    st.title("Aplikasi Rekomendasi dan Edukasi Parfum")
 
-    menu = ["Home", "Search Perfume", "Add New Perfume", "AI Model"]
+    menu = ["Home", "Rekomendasi Parfum", "Edukasi Parfum", "Search Perfume", "Add New Perfume", "Visualisasi Data"]
     choice = st.sidebar.selectbox("Menu", menu)
 
     df = get_perfume_data()
@@ -408,8 +406,36 @@ def main():
         df = clean_data(df)
 
     if choice == "Home":
-        st.write("Selamat datang di Aplikasi Rekomendasi Parfum!")
-        visualize_data(df)
+        st.write("Selamat datang di Aplikasi Rekomendasi dan Edukasi Parfum!")
+        st.write("Pilih menu di sidebar untuk memulai.")
+
+    elif choice == "Rekomendasi Parfum":
+        st.subheader("Rekomendasi Parfum")
+        perfume_name = st.selectbox("Pilih parfum yang Anda sukai:", df['Nama Parfum'].tolist())
+
+        if st.button("Dapatkan Rekomendasi"):
+            tfidf_matrix = create_feature_matrix(df)
+            recommendations = get_recommendations(perfume_name, df, tfidf_matrix)
+
+            st.write("Rekomendasi parfum untuk Anda:")
+            for idx, row in recommendations.iterrows():
+                st.write(f"{row['Nama Parfum']} - {row['Brand atau Produsen']}")
+
+    elif choice == "Edukasi Parfum":
+        st.subheader("Edukasi Parfum")
+        perfume_name = st.selectbox("Pilih parfum untuk dipelajari:", df['Nama Parfum'].tolist())
+        level = st.radio("Pilih tingkat penjelasan:", ('Pemula', 'Expert'))
+
+        if st.button("Pelajari Parfum"):
+            perfume = df[df['Nama Parfum'] == perfume_name].iloc[0]
+            perfume_info = extract_perfume_info(perfume)
+            description = generate_perfume_description(perfume_info, level.lower())
+            st.write(description)
+
+            question = st.text_input("Tanyakan sesuatu tentang parfum ini:")
+            if question:
+                answer = answer_perfume_question(question, perfume_info)
+                st.write(answer)
 
     elif choice == "Search Perfume":
         st.subheader("Cari Parfum")
@@ -470,7 +496,6 @@ def main():
     elif choice == "Add New Perfume":
         st.subheader("Tambah Parfum Baru")
 
-        # Tampilkan status database sebelum penambahan
         st.write("Status Database Sebelum Penambahan:")
         initial_status = check_database_status()
         if initial_status:
@@ -496,7 +521,6 @@ def main():
         if st.button("Tambah Parfum"):
             if nama and brand:
                 if image:
-                    # Save the image in the 'img' folder
                     os.makedirs("img", exist_ok=True)
                     image_path = os.path.join("img", image.name)
                     with open(image_path, "wb") as f:
@@ -531,7 +555,6 @@ def main():
                         else:
                             st.warning("Parfum berhasil ditambahkan tetapi mungkin belum tersimpan permanen. Silakan cek database.")
 
-                        # Tampilkan status database setelah penambahan
                         st.write("Status Database Setelah Penambahan:")
                         final_status = check_database_status()
                         if final_status:
@@ -551,10 +574,8 @@ def main():
             else:
                 st.error("Nama Parfum dan Brand harus diisi.")
 
-    elif choice == "AI Model":
-        st.subheader("Pemodelan AI untuk Prediksi")
-        model_type = st.radio("Pilih Tipe Model", ("regression", "classification"))
-        ai_model(df, model_type)
+    elif choice == "Visualisasi Data":
+        visualize_data(df)
 
 if __name__ == "__main__":
     try:
@@ -565,3 +586,4 @@ if __name__ == "__main__":
         st.error("Aplikasi mengalami error. Silakan cek log untuk detailnya.")
 
 print("Aplikasi Rekomendasi Parfum berhasil dijalankan!")
+
