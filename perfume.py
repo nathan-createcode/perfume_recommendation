@@ -551,7 +551,7 @@ def main():
                             if os.path.exists(full_path):
                                 try:
                                     image = Image.open(full_path)
-                                    st.image(image, caption=row['Nama Parfum'], use_column_width=True)
+                                    st.image(image, caption=row['Nama Parfum'], use_container_width=True)
                                 except Exception as e:
                                     st.error(f"Terjadi kesalahan saat menampilkan gambar: {e}")
                             else:
