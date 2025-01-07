@@ -464,7 +464,6 @@ def main():
         if st.button("Pelajari Parfum"):
             perfume = df[df['Nama Parfum'] == perfume_name].iloc[0]
             perfume_info = extract_perfume_info(perfume)
-            description = generate_perfume_description(perfume_info, level.lower())
 
             st.write("### Informasi Parfum")
             st.write(f"**Nama Parfum:** {perfume_info['nama']}")
