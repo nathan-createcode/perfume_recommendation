@@ -36,14 +36,6 @@ def get_db_connection():
     try:
         conn = sqlite3.connect('perfume_recommendation.db', check_same_thread=False)
         conn.row_factory = sqlite3.Row
-
-        # Nonaktifkan write-ahead logging
-        conn.execute("PRAGMA journal_mode=DELETE")
-        # Aktifkan synchronous mode
-        conn.execute("PRAGMA synchronous=FULL")
-        # Aktifkan foreign key constraints
-        conn.execute("PRAGMA foreign_keys=ON")
-
         logging.info("Database connection established successfully")
         return conn
     except Error as e:
@@ -56,17 +48,6 @@ def close_db_connection(conn):
         conn.close()
         logging.info("Database connection closed.")
 
-# Fungsi untuk membersihkan kolom harga
-def clean_price_column(df):
-    try:
-        df['Harga'] = df['Harga'].str.replace('Rp', '', regex=False).str.replace('.', '', regex=False)
-        df['Harga'] = pd.to_numeric(df['Harga'], errors='coerce')
-        df = df.dropna(subset=['Harga'])
-        return df
-    except Exception as e:
-        st.error(f"Terjadi kesalahan saat membersihkan kolom 'Harga': {e}")
-        return df
-
 # Fungsi untuk membaca data dari database
 def get_perfume_data():
     conn = get_db_connection()
@@ -77,12 +58,6 @@ def get_perfume_data():
     try:
         query = "SELECT * FROM perfumes"
         df = pd.read_sql_query(query, conn)
-        required_columns = ['Nama Parfum', 'Brand atau Produsen', 'Kategori Aroma', 'Top Notes',
-                          'Middle Notes', 'Base Notes', 'Gender', 'Harga']
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            st.error(f"Kolom yang diperlukan tidak ditemukan dalam database: {', '.join(missing_columns)}")
-            return pd.DataFrame()
         return df
     except pd.io.sql.DatabaseError as e:
         logging.error(f"Error reading data from database: {e}")
@@ -105,54 +80,15 @@ def clean_data(df):
         df[col] = df[col].apply(safe_eval)
     return df
 
-# Fungsi untuk visualisasi data
-def visualize_data(df):
-    st.subheader("Visualisasi Data Parfum")
-
-    # Visualisasi berdasarkan Kategori Aroma
-    st.write("Distribusi Parfum berdasarkan Kategori Aroma")
-    aroma_counts = df['Kategori Aroma'].value_counts()
-    fig, ax = plt.subplots(figsize=(12, 6))
-    sns.barplot(x=aroma_counts.index, y=aroma_counts.values, ax=ax, palette="viridis")
-    plt.xticks(rotation=45, ha='right')
-    plt.tight_layout()
-    st.pyplot(fig)
-
-    # Visualisasi berdasarkan Gender
-    st.write("Distribusi Parfum berdasarkan Gender")
-    gender_counts = df['Gender'].value_counts()
-    fig, ax = plt.subplots(figsize=(8, 6))
-    sns.barplot(x=gender_counts.index, y=gender_counts.values, ax=ax, palette="pastel")
-    plt.tight_layout()
-    st.pyplot(fig)
-
-    # Visualisasi berdasarkan Brand
-    st.write("Top 10 Brand Parfum")
-    brand_counts = df['Brand atau Produsen'].value_counts().head(10)
-    fig, ax = plt.subplots(figsize=(10, 6))
-    sns.barplot(x=brand_counts.values, y=brand_counts.index, ax=ax, palette="Set2")
-    plt.tight_layout()
-    st.pyplot(fig)
-
-# Fungsi untuk sistem rekomendasi berbasis konten
+# Content-Based Filtering
 def create_feature_matrix(df):
-    # Fitur yang akan digunakan untuk rekomendasi
     features = ['Kategori Aroma', 'Top Notes', 'Middle Notes', 'Base Notes', 'Gender']
-
-    # Menggabungkan semua fitur menjadi satu string
-    df['combined_features'] = df.apply(lambda row: ' '.join(str(row[feature]) for feature in features), axis=1)
-
-    # Menggunakan TF-IDF untuk fitur teks
+    df['combined_features'] = df.apply(lambda row: ' '.join([str(row[feature]) for feature in features]), axis=1)
     tfidf = TfidfVectorizer(stop_words='english')
     tfidf_matrix = tfidf.fit_transform(df['combined_features'])
-
-    # Menormalisasi harga
     scaler = MinMaxScaler()
     df['normalized_price'] = scaler.fit_transform(df[['Harga']])
-
-    # Menggabungkan matriks TF-IDF dengan harga yang dinormalisasi
     feature_matrix = np.hstack((tfidf_matrix.toarray(), df['normalized_price'].values.reshape(-1, 1)))
-
     return feature_matrix
 
 def get_recommendations(perfume_name, df, feature_matrix):
@@ -164,7 +100,7 @@ def get_recommendations(perfume_name, df, feature_matrix):
     perfume_indices = [i[0] for i in sim_scores]
     return df.iloc[perfume_indices]
 
-# Fungsi untuk NLP dan edukasi parfum
+# NLP untuk Edukasi Parfum
 def preprocess_text(text):
     tokens = word_tokenize(text.lower())
     stop_words = set(stopwords.words('indonesian'))
@@ -194,12 +130,10 @@ def generate_perfume_description(perfume_info, level='pemula'):
         description += f"Top notes: {', '.join(perfume_info['top_notes'])}. "
         description += f"Middle notes: {', '.join(perfume_info['middle_notes'])}. "
         description += f"Base notes: {', '.join(perfume_info['base_notes'])}."
-
     return description
 
 def answer_perfume_question(question, perfume_info):
     tokens = preprocess_text(question)
-
     if 'apa' in tokens and 'top' in tokens and 'notes' in tokens:
         return f"Top notes dari {perfume_info['nama']} adalah {', '.join(perfume_info['top_notes'])}."
     elif 'siapa' in tokens and 'pembuat' in tokens:
@@ -209,19 +143,32 @@ def answer_perfume_question(question, perfume_info):
     else:
         return "Maaf, saya tidak dapat menjawab pertanyaan tersebut. Coba tanyakan tentang top notes, pembuat, atau kategori parfum."
 
-def normalize_price(price_str):
-    if not price_str:
-        return None
-    # Remove 'Rp', dots, spaces, and commas
-    price_str = price_str.replace('Rp', '').replace('.', '').replace(' ', '').replace(',', '')
-    try:
-        # Convert to integer
-        price = int(price_str)
-        # Format back to standard format
-        return f"Rp{price:,}".replace(',', '.')
-    except ValueError:
-        return None
+# Fungsi untuk visualisasi data
+def visualize_data(df):
+    st.subheader("Visualisasi Data Parfum")
+    st.write("Distribusi Parfum berdasarkan Kategori Aroma")
+    aroma_counts = df['Kategori Aroma'].value_counts()
+    fig, ax = plt.subplots(figsize=(12, 6))
+    sns.barplot(x=aroma_counts.index, y=aroma_counts.values, ax=ax)
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+    st.pyplot(fig)
 
+    st.write("Distribusi Parfum berdasarkan Gender")
+    gender_counts = df['Gender'].value_counts()
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sns.barplot(x=gender_counts.index, y=gender_counts.values, ax=ax)
+    plt.tight_layout()
+    st.pyplot(fig)
+
+    st.write("Top 10 Brand Parfum")
+    brand_counts = df['Brand atau Produsen'].value_counts().head(10)
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.barplot(x=brand_counts.values, y=brand_counts.index, ax=ax)
+    plt.tight_layout()
+    st.pyplot(fig)
+
+# Fungsi untuk menambahkan parfum baru
 def add_new_perfume(data):
     conn = get_db_connection()
     if not conn:
@@ -230,10 +177,6 @@ def add_new_perfume(data):
 
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM perfumes")
-        count_before = cursor.fetchone()[0]
-        logging.info(f"Jumlah parfum sebelum penambahan: {count_before}")
-
         query = """
         INSERT INTO perfumes (
             "Nama Parfum", "Brand atau Produsen", "Jenis", "Kategori Aroma",
@@ -242,122 +185,16 @@ def add_new_perfume(data):
             "image_path", "Gender"
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
-
-        logging.info(f"Memulai transaksi untuk menambah parfum baru: {data['Nama Parfum']}")
-
-        # Mulai transaksi dengan IMMEDIATE untuk mengunci database
-        conn.execute("BEGIN IMMEDIATE TRANSACTION")
-
-        # Eksekusi query insert
         cursor.execute(query, tuple(data.values()))
-
-        # Verifikasi penambahan
-        cursor.execute("SELECT COUNT(*) FROM perfumes")
-        count_after = cursor.fetchone()[0]
-        logging.info(f"Jumlah parfum setelah penambahan: {count_after}")
-
-        if count_after > count_before:
-            # Verifikasi data yang baru ditambahkan
-            cursor.execute(
-                'SELECT * FROM perfumes WHERE "Nama Parfum" = ? AND "Brand atau Produsen" = ?',
-                (data['Nama Parfum'], data['Brand atau Produsen'])
-            )
-            new_perfume = cursor.fetchone()
-
-            if new_perfume:
-                logging.info(f"Data parfum baru berhasil diverifikasi: {new_perfume}")
-                conn.commit()
-
-                # Paksa flush ke disk
-                conn.execute("PRAGMA wal_checkpoint")
-                conn.execute("VACUUM")
-
-                logging.info("Transaksi berhasil di-commit dan di-flush ke disk")
-                return True
-            else:
-                logging.error("Data parfum baru tidak ditemukan setelah insert")
-                conn.rollback()
-                return False
-        else:
-            logging.error(f"Jumlah parfum tidak bertambah: {count_before} -> {count_after}")
-            conn.rollback()
-            return False
-
-    except sqlite3.Error as e:
-        logging.error(f"Error dalam transaksi database: {e}")
-        if conn:
-            conn.rollback()
-            logging.info("Transaksi di-rollback karena error")
-        return False
-    finally:
-        if conn:
-            try:
-                conn.execute("PRAGMA integrity_check")
-                logging.info("Database integrity check passed")
-            except sqlite3.Error as e:
-                logging.error(f"Database integrity check failed: {e}")
-            finally:
-                close_db_connection(conn)
-
-def check_database_status():
-    conn = get_db_connection()
-    if not conn:
-        st.error("Tidak dapat terhubung ke database.")
-        return
-
-    try:
-        cursor = conn.cursor()
-
-        # Periksa jumlah total parfum
-        cursor.execute("SELECT COUNT(*) FROM perfumes")
-        total_count = cursor.fetchone()[0]
-        logging.info(f"Total parfum dalam database: {total_count}")
-
-        # Periksa parfum terakhir yang ditambahkan
-        cursor.execute("""
-            SELECT "Nama Parfum", "Brand atau Produsen"
-            FROM perfumes
-            ORDER BY rowid DESC
-            LIMIT 1
-        """)
-        last_perfume = cursor.fetchone()
-        if last_perfume:
-            logging.info(f"Parfum terakhir dalam database: {last_perfume}")
-
-        # Periksa integritas database
-        cursor.execute("PRAGMA integrity_check")
-        integrity_result = cursor.fetchone()[0]
-        logging.info(f"Database integrity check result: {integrity_result}")
-
-        return {
-            'total_count': total_count,
-            'last_perfume': last_perfume,
-            'integrity': integrity_result
-        }
-    except sqlite3.Error as e:
-        logging.error(f"Error saat memeriksa status database: {e}")
-        return None
-    finally:
-        close_db_connection(conn)
-
-# Tambahan fungsi untuk memastikan database tersimpan
-def ensure_database_saved():
-    conn = get_db_connection()
-    if not conn:
-        return False
-
-    try:
-        # Paksa semua perubahan tersimpan ke disk
-        conn.execute("PRAGMA wal_checkpoint")
-        conn.execute("VACUUM")
         conn.commit()
         return True
     except sqlite3.Error as e:
-        logging.error(f"Error ensuring database saved: {e}")
+        logging.error(f"Error dalam transaksi database: {e}")
         return False
     finally:
         close_db_connection(conn)
 
+# Fungsi untuk mencari parfum
 def search_perfume(query, filters):
     conn = get_db_connection()
     if not conn:
@@ -365,10 +202,7 @@ def search_perfume(query, filters):
         return pd.DataFrame()
 
     try:
-        sql_query = """
-        SELECT * FROM perfumes
-        WHERE 1=1
-        """
+        sql_query = "SELECT * FROM perfumes WHERE 1=1"
         params = []
 
         if filters['nama_parfum']:
@@ -393,40 +227,14 @@ def search_perfume(query, filters):
             sql_query += ' AND "Musim atau Cuaca" = ?'
             params.append(filters['musim'])
         if filters['max_harga']:
-            normalized_price = normalize_price(filters['max_harga'])
-            if normalized_price:
-                sql_query += ' AND CAST(REPLACE(REPLACE(Harga, "Rp", ""), ".", "") AS INTEGER) <= ?'
-                params.append(int(normalized_price.replace('Rp', '').replace('.', '')))
+            sql_query += ' AND CAST(REPLACE(REPLACE(Harga, "Rp", ""), ".", "") AS INTEGER) <= ?'
+            params.append(int(filters['max_harga'].replace('Rp', '').replace('.', '')))
 
         df = pd.read_sql_query(sql_query, conn, params=params)
         return df
     except sqlite3.Error as e:
         logging.error(f"Error searching perfume: {e}")
         return pd.DataFrame()
-    finally:
-        close_db_connection(conn)
-
-def normalize_image_path(path):
-    if not path:
-        return ""
-    # Ubah backslash menjadi forward slash
-    normalized = path.replace('\\', '/')
-    # Hapus awalan 'perfume_recommendation/' jika ada
-    if normalized.startswith('perfume_recommendation/'):
-        normalized = normalized[len('perfume_recommendation/'):]
-    return normalized
-
-def optimize_database():
-    conn = get_db_connection()
-    if not conn:
-        st.error("Tidak dapat terhubung ke database.")
-        return
-
-    try:
-        conn.execute("VACUUM")
-        logging.info("Database optimized successfully")
-    except sqlite3.Error as e:
-        logging.error(f"Error optimizing database: {e}")
     finally:
         close_db_connection(conn)
 
@@ -508,21 +316,11 @@ def main():
                     col1, col2 = st.columns(2)
                     with col1:
                         if 'image_path' in row and row['image_path']:
-                            normalized_path = normalize_image_path(row['image_path'])
-                            full_path = os.path.join(os.getcwd(), normalized_path)
-                            if os.path.exists(full_path):
-                                try:
-                                    image = Image.open(full_path)
-                                    st.image(image, caption=row['Nama Parfum'], use_column_width=True)
-                                except Exception as e:
-                                    st.error(f"Terjadi kesalahan saat menampilkan gambar: {e}")
-                            else:
-                                st.write("Gambar tidak ditemukan.")
-                        else:
-                            st.write("Path gambar tidak tersedia dalam data.")
+                            image = Image.open(row['image_path'])
+                            st.image(image, caption=row['Nama Parfum'], use_column_width=True)
                     with col2:
                         for column in results.columns:
-                            if column not in ['Nama Parfum', 'image_path', 'created_at', 'updated_at']:
+                            if column not in ['Nama Parfum', 'image_path']:
                                 st.write(f"**{column}:** {row[column]}")
                     st.write("---")
             else:
@@ -530,15 +328,6 @@ def main():
 
     elif choice == "Add New Perfume":
         st.subheader("Tambah Parfum Baru")
-
-        # Tampilkan status database sebelum penambahan
-        st.write("Status Database Sebelum Penambahan:")
-        initial_status = check_database_status()
-        if initial_status:
-            st.write(f"Total parfum: {initial_status['total_count']}")
-            if initial_status['last_perfume']:
-                st.write(f"Parfum terakhir: {initial_status['last_perfume'][0]}")
-
         nama = st.text_input("Nama Parfum")
         brand = st.text_input("Brand atau Produsen")
         jenis = st.selectbox("Jenis Parfum", ["EDP", "EDT", "EDC", "Perfume", "Extrait de Parfum", "Parfum Cologne"])
@@ -549,7 +338,7 @@ def main():
         kekuatan = st.selectbox("Kekuatan Aroma", ["Ringan", "Sedang", "Kuat", "Sangat Kuat"])
         daya_tahan = st.selectbox("Daya Tahan", ["Pendek", "Sedang", "Lama", "Sangat Lama"])
         musim = st.selectbox("Musim atau Cuaca", ["Semua Musim", "Musim Panas", "Musim Dingin", "Musim Semi", "Musim Gugur", "Malam Hari"])
-        harga = st.text_input("Harga (contoh: 7000000, 7.000.000, atau Rp7.000.000)")
+        harga = st.text_input("Harga (contoh: 7000000)")
         ukuran = st.text_input("Ukuran Botol")
         gender = st.selectbox("Gender", ["Female", "Male", "Unisex"])
         image = st.file_uploader("Upload Gambar Parfum", type=['png', 'jpg', 'jpeg'])
@@ -557,58 +346,33 @@ def main():
         if st.button("Tambah Parfum"):
             if nama and brand:
                 if image:
-                    # Save the image in the 'img' folder
-                    os.makedirs("img", exist_ok=True)
                     image_path = os.path.join("img", image.name)
                     with open(image_path, "wb") as f:
                         f.write(image.getbuffer())
                 else:
                     image_path = ""
 
-                normalized_harga = normalize_price(harga)
-                if not normalized_harga:
-                    st.error("Format harga tidak valid. Harap masukkan harga dalam format yang benar.")
+                new_perfume = {
+                    "Nama Parfum": nama,
+                    "Brand atau Produsen": brand,
+                    "Jenis": jenis,
+                    "Kategori Aroma": kategori,
+                    "Top Notes": str([x.strip() for x in top_notes.split(',')]),
+                    "Middle Notes": str([x.strip() for x in middle_notes.split(',')]),
+                    "Base Notes": str([x.strip() for x in base_notes.split(',')]),
+                    "Kekuatan Aroma": kekuatan,
+                    "Daya Tahan": daya_tahan,
+                    "Musim atau Cuaca": musim,
+                    "Harga": harga,
+                    "Ukuran Botol": ukuran,
+                    "image_path": image_path,
+                    "Gender": gender
+                }
+
+                if add_new_perfume(new_perfume):
+                    st.success("Parfum baru berhasil ditambahkan!")
                 else:
-                    new_perfume = {
-                        "Nama Parfum": nama,
-                        "Brand atau Produsen": brand,
-                        "Jenis": jenis,
-                        "Kategori Aroma": kategori,
-                        "Top Notes": str([x.strip() for x in top_notes.split(',')]),
-                        "Middle Notes": str([x.strip() for x in middle_notes.split(',')]),
-                        "Base Notes": str([x.strip() for x in base_notes.split(',')]),
-                        "Kekuatan Aroma": kekuatan,
-                        "Daya Tahan": daya_tahan,
-                        "Musim atau Cuaca": musim,
-                        "Harga": normalized_harga,
-                        "Ukuran Botol": ukuran,
-                        "image_path": image_path,
-                        "Gender": gender
-                    }
-
-                    if add_new_perfume(new_perfume):
-                        if ensure_database_saved():
-                            st.success("Parfum baru berhasil ditambahkan dan tersimpan ke database!")
-                        else:
-                            st.warning("Parfum berhasil ditambahkan tetapi mungkin belum tersimpan permanen. Silakan cek database.")
-
-                        # Tampilkan status database setelah penambahan
-                        st.write("Status Database Setelah Penambahan:")
-                        final_status = check_database_status()
-                        if final_status:
-                            st.write(f"Total parfum: {final_status['total_count']}")
-                            if final_status['last_perfume']:
-                                st.write(f"Parfum terakhir: {final_status['last_perfume'][0]}")
-
-                        if final_status and initial_status:
-                            if final_status['total_count'] > initial_status['total_count']:
-                                st.success(f"Jumlah parfum berhasil bertambah dari {initial_status['total_count']} menjadi {final_status['total_count']}")
-                            else:
-                                st.warning("Jumlah parfum tidak bertambah setelah penambahan")
-
-                        logging.info(f"New perfume added: {new_perfume}")
-                    else:
-                        st.error("Terjadi kesalahan saat menambahkan parfum baru. Silakan cek log untuk detailnya.")
+                    st.error("Terjadi kesalahan saat menambahkan parfum baru.")
             else:
                 st.error("Nama Parfum dan Brand harus diisi.")
 
@@ -616,12 +380,7 @@ def main():
         visualize_data(df)
 
 if __name__ == "__main__":
-    try:
-        optimize_database()
-        main()
-    except Exception as e:
-        logging.error(f"Error in main: {e}")
-        st.error("Aplikasi mengalami error. Silakan cek log untuk detailnya.")
+    main()
 
 print("Aplikasi Rekomendasi Parfum berhasil dijalankan!")
 
