@@ -30,6 +30,8 @@ logging.basicConfig(
 # Download NLTK data
 nltk.download('punkt')
 nltk.download('stopwords')
+nltk.download('punkt')
+nltk.download('stopwords')
 
 # Fungsi untuk mendapatkan koneksi database
 def get_db_connection():
@@ -176,30 +178,25 @@ def extract_perfume_info(perfume):
     return info
 
 def generate_perfume_description(perfume_info, level='pemula'):
-    if level == 'pemula':
-        description = f"{perfume_info['nama']} adalah parfum {perfume_info['kategori']} dari {perfume_info['brand']}. "
-        description += f"Parfum ini cocok untuk {perfume_info['gender']}. "
-        description += f"Aroma utamanya adalah {perfume_info['top_notes'][0] if perfume_info['top_notes'] else 'tidak diketahui'}."
-    else:  # expert
-        description = f"{perfume_info['nama']} adalah kreasi {perfume_info['brand']} dalam kategori {perfume_info['kategori']}. "
-        description += f"Didesain untuk {perfume_info['gender']}, parfum ini memiliki profil aroma yang kompleks. "
-        description += f"Top notes: {', '.join(perfume_info['top_notes'])}. "
-        description += f"Middle notes: {', '.join(perfume_info['middle_notes'])}. "
-        description += f"Base notes: {', '.join(perfume_info['base_notes'])}."
+    description = {
+        'nama': f"Nama Parfum: {perfume_info['nama']}",
+        'brand': f"Brand: {perfume_info['brand']}",
+        'kategori': f"Kategori: {perfume_info['kategori']}",
+        'gender': f"Gender: {perfume_info['gender']}",
+    }
+
+    if level == 'expert':
+        description.update({
+            'top_notes': f"Top Notes: {', '.join(perfume_info['top_notes'])}",
+            'middle_notes': f"Middle Notes: {', '.join(perfume_info['middle_notes'])}",
+            'base_notes': f"Base Notes: {', '.join(perfume_info['base_notes'])}"
+        })
+    else:  # pemula
+        description.update({
+            'aroma_utama': f"Aroma Utama: {perfume_info['top_notes'][0] if perfume_info['top_notes'] else 'tidak diketahui'}"
+        })
 
     return description
-
-def answer_perfume_question(question, perfume_info):
-    tokens = preprocess_text(question)
-
-    if 'apa' in tokens and 'top' in tokens and 'notes' in tokens:
-        return f"Top notes dari {perfume_info['nama']} adalah {', '.join(perfume_info['top_notes'])}."
-    elif 'siapa' in tokens and 'pembuat' in tokens:
-        return f"{perfume_info['nama']} dibuat oleh {perfume_info['brand']}."
-    elif 'kategori' in tokens:
-        return f"{perfume_info['nama']} termasuk dalam kategori {perfume_info['kategori']}."
-    else:
-        return "Maaf, saya tidak dapat menjawab pertanyaan tersebut. Coba tanyakan tentang top notes, pembuat, atau kategori parfum."
 
 def normalize_price(price_str):
     if not price_str:
@@ -457,13 +454,25 @@ def main():
         if st.button("Pelajari Parfum"):
             perfume = df[df['Nama Parfum'] == perfume_name].iloc[0]
             perfume_info = extract_perfume_info(perfume)
-            description = generate_perfume_description(perfume_info, level.lower())
-            st.write(description)
 
-            question = st.text_input("Tanyakan sesuatu tentang parfum ini:")
-            if question:
-                answer = answer_perfume_question(question, perfume_info)
-                st.write(answer)
+            st.write("### Informasi Parfum")
+            st.write(f"**Nama Parfum:** {perfume_info['nama']}")
+            st.write(f"**Brand:** {perfume_info['brand']}")
+            st.write(f"**Kategori:** {perfume_info['kategori']}")
+            st.write(f"**Gender:** {perfume_info['gender']}")
+
+            if level.lower() == 'expert':
+                st.write(f"**Top Notes:** {', '.join(perfume_info['top_notes'])}")
+                st.write(f"**Middle Notes:** {', '.join(perfume_info['middle_notes'])}")
+                st.write(f"**Base Notes:** {', '.join(perfume_info['base_notes'])}")
+            else:
+                st.write(f"**Aroma Utama:** {perfume_info['top_notes'][0] if perfume_info['top_notes'] else 'tidak diketahui'}")
+
+            st.write("\n### Panduan Penggunaan")
+            st.write("1. Aplikasikan parfum pada titik nadi (pergelangan tangan, leher, belakang telinga)")
+            st.write("2. Jangan menggosok parfum setelah diaplikasikan")
+            st.write("3. Aplikasikan pada kulit yang bersih dan lembab")
+            st.write("4. Simpan parfum di tempat yang sejuk dan terhindar dari sinar matahari langsung")
 
     elif choice == "Search Perfume":
         st.subheader("Cari Parfum")
