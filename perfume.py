@@ -467,17 +467,17 @@ def main():
             description = generate_perfume_description(perfume_info, level.lower())
 
             st.write("### Informasi Parfum")
-            for key, value in description.items():
-                st.write(f"**{value}**")
+            st.write(f"**Nama Parfum:** {perfume_info['nama']}")
+            st.write(f"**Brand:** {perfume_info['brand']}")
+            st.write(f"**Kategori:** {perfume_info['kategori']}")
+            st.write(f"**Gender:** {perfume_info['gender']}")
 
             if level.lower() == 'expert':
-                st.write("\n### Penjelasan Detail")
-                st.write("Top Notes: Aroma yang pertama kali tercium saat parfum diaplikasikan.")
-                st.write("Middle Notes: Aroma yang muncul setelah top notes menghilang.")
-                st.write("Base Notes: Aroma dasar yang bertahan paling lama.")
+                st.write(f"**Top Notes:** {', '.join(perfume_info['top_notes'])}")
+                st.write(f"**Middle Notes:** {', '.join(perfume_info['middle_notes'])}")
+                st.write(f"**Base Notes:** {', '.join(perfume_info['base_notes'])}")
             else:
-                st.write("\n### Penjelasan Singkat")
-                st.write("Aroma Utama: Aroma yang paling dominan dan pertama kali tercium.")
+                st.write(f"**Aroma Utama:** {perfume_info['top_notes'][0] if perfume_info['top_notes'] else 'tidak diketahui'}")
 
             st.write("\n### Panduan Penggunaan")
             st.write("1. Aplikasikan parfum pada titik nadi (pergelangan tangan, leher, belakang telinga)")
